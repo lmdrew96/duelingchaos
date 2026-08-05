@@ -109,6 +109,13 @@
   font-size: 0.9rem;
 }
 
+.board-loading {
+  align-self: center;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
 .board-error + .refresh-btn {
   align-self: center;
 }

@@ -216,6 +216,7 @@ function DeckbuilderCore({
 
   const handleDelete = async (name: string, event: React.MouseEvent) => {
     event.stopPropagation();
+    if (!window.confirm(`Delete "${name}"? This can't be undone.`)) return;
     const token = await getToken();
     if (!token) return;
     await api.deleteDeck(name, token);

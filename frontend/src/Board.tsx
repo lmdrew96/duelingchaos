@@ -781,7 +781,13 @@ export default function Board({ onExit }: { onExit: () => void }) {
     );
   }
 
-  if (!state) return null;
+  if (!state) {
+    return (
+      <div className="board-shell">
+        <p className="board-loading">Loading board…</p>
+      </div>
+    );
+  }
 
   const human = state.players.find((p) => !p.isAI) ?? state.players[0];
   const opponent = state.players.find((p) => p.isAI) ?? state.players[1];
