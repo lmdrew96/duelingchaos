@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpServer;
 
 import forge.StaticData;
 import forge.card.CardDb;
+import forge.card.CardRules;
 import forge.deck.CardPool;
 import forge.deck.Deck;
 import forge.deck.DeckFormat;
@@ -24,6 +25,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 // Deckbuilder patch: card search, format/legality lookups, and deck
 // save/load, all backed directly by Forge's own card and format databases
@@ -49,15 +51,16 @@ public final class DeckboxHandlers {
 
     private static void handleCardSearch(HttpExchange exchange) throws IOException {
         Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
-        String q = query.getOrDefault("q", "").toLowerCase();
+        String q = query.getOrDefault("q", "");
         int limit = parseIntOr(query.get("limit"), 50);
         if (limit > 200) limit = 200;
 
+        Predicate<CardRules> predicate = ScryfallQuery.parse(q);
         CardDb db = StaticData.instance().getCommonCards();
         List<PaperCard> results = new ArrayList<>();
         for (PaperCard pc : db.getUniqueCards()) {
             if (results.size() >= limit) break;
-            if (q.isEmpty() || pc.getName().toLowerCase().contains(q)) {
+            if (predicate.test(pc.getRules())) {
                 results.add(pc);
             }
         }

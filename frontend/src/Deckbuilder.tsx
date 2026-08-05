@@ -132,7 +132,7 @@ export default function Deckbuilder() {
           <input
             className="search-input"
             type="text"
-            placeholder="Search by name…"
+            placeholder="Search by name, or syntax: t:creature c:rg mv>=3 o:&quot;draw a card&quot;…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
