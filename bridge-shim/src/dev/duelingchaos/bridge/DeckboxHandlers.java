@@ -184,16 +184,42 @@ public final class DeckboxHandlers {
         String body = readBody(exchange);
         CardPool pool = parseDecklist(body);
 
+        GameFormat format = FModel.getFormats().getFormat(formatName);
+        DeckFormat structuralFormat = structuralFormatFor(format);
+
         Deck deck = new Deck("Legality Check");
         deck.putSection(forge.deck.DeckSection.Main, pool);
-        deck.setDeckFormat(DeckFormat.Constructed);
+        deck.setDeckFormat(structuralFormat);
 
-        String structuralProblem = DeckFormat.Constructed.getDeckConformanceProblem(deck);
-
-        GameFormat format = FModel.getFormats().getFormat(formatName);
+        String structuralProblem = structuralFormat.getDeckConformanceProblem(deck);
         String banlistProblem = format == null ? null : format.getDeckConformanceProblem(deck);
 
         respond(exchange, 200, CardDbJson.serializeLegality(pool.countAll(), structuralProblem, banlistProblem));
+    }
+
+    // The selected format is a GameFormat (banlist/legal-sets — a separate
+    // axis from deck *shape*), so it was previously ignored for the
+    // structural check entirely, meaning every format got Constructed's
+    // 60-card rules — a Commander deck's missing-commander/singleton
+    // violations never surfaced. DeckFormat's enum constants share exact
+    // names with the formats that need a different shape (verified against
+    // the actual res/formats/*.txt files: Commander.txt/Oathbreaker.txt/
+    // Brawl.txt/Pauper.txt all use "Name:" matching a DeckFormat constant
+    // 1:1), so valueOf-by-name covers those directly. Names that don't
+    // match (Standard/Modern/Legacy/Vintage/Pioneer/Extended/Block, or a
+    // casual format like PreDH with no DeckFormat entry of its own) fall
+    // back to the format's own Commander subtype signal — PreDH.txt
+    // declares Subtype:Commander despite not being named "Commander" — and
+    // Constructed's ordinary shape otherwise.
+    private static DeckFormat structuralFormatFor(GameFormat format) {
+        if (format == null) return DeckFormat.Constructed;
+        try {
+            return DeckFormat.valueOf(format.getName());
+        } catch (IllegalArgumentException e) {
+            return format.getFormatSubType() == GameFormat.FormatSubType.COMMANDER
+                ? DeckFormat.Commander
+                : DeckFormat.Constructed;
+        }
     }
 
     @SuppressWarnings("unchecked")
