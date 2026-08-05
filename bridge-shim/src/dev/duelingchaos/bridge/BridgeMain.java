@@ -108,6 +108,8 @@ public class BridgeMain {
         server.createContext("/action/select-number", BridgeMain::handleSelectNumber);
         server.createContext("/action/assign-damage", BridgeMain::handleAssignDamage);
         server.createContext("/action/select-entity", BridgeMain::handleSelectEntity);
+        server.createContext("/action/concede", BridgeMain::handleConcede);
+        server.createContext("/action/undo", BridgeMain::handleUndo);
         DeckboxHandlers.register(server, decksDir);
         server.setExecutor(null);
         server.start();
@@ -126,8 +128,35 @@ public class BridgeMain {
 
     private static void handleState(HttpExchange exchange) throws IOException {
         Game game = currentGame;
-        String json = game == null ? "{}" : GameStateJson.serialize(game.getView(), gui);
+        boolean canUndo = humanController != null && humanController.canUndoLastAction();
+        String json = game == null ? "{}" : GameStateJson.serialize(game.getView(), gui, canUndo);
         respond(exchange, 200, json);
+    }
+
+    // concede() ends the game immediately with the human as the loser — no
+    // pendingChoice/rendezvous needed, it's a direct one-way action like
+    // passPriority. Confirming with the player is the frontend's job (same
+    // pattern as the deckbuilder's delete-deck confirm).
+    private static void handleConcede(HttpExchange exchange) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            respond(exchange, 405, "{\"error\":\"POST only\"}");
+            return;
+        }
+        humanController.concede();
+        respond(exchange, 200, "{\"ok\":true}");
+    }
+
+    // tryUndoLastAction() is the safe variant of undoLastAction() — returns
+    // false instead of throwing when there's nothing to undo, so a stale
+    // enabled button (a race with the poll tick) fails soft rather than
+    // crashing the game thread.
+    private static void handleUndo(HttpExchange exchange) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            respond(exchange, 405, "{\"error\":\"POST only\"}");
+            return;
+        }
+        boolean ok = humanController != null && humanController.tryUndoLastAction();
+        respond(exchange, 200, "{\"ok\":" + ok + "}");
     }
 
     private static void handlePassPriority(HttpExchange exchange) throws IOException {

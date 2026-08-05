@@ -95,6 +95,8 @@ async function postAction(path: string, body?: object): Promise<void> {
 export const passPriority = (): Promise<void> => postAction('pass-priority');
 export const selectOk = (): Promise<void> => postAction('select-ok');
 export const selectCancel = (): Promise<void> => postAction('select-cancel');
+export const concede = (): Promise<void> => postAction('concede');
+export const undo = (): Promise<void> => postAction('undo');
 // Same underlying "click a card" selection Forge uses for casting a spell,
 // playing a land, AND answering a card-selection prompt (e.g. cleanup
 // discard) — InputProxy figures out what the click means server-side.

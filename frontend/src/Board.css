@@ -58,6 +58,24 @@
   color: var(--bg);
 }
 
+/* Same hairline-outline shape as refresh, but in the danger tone — it's a
+   one-way, game-ending action, so it should never read as just another
+   neutral utility button next to refresh/undo. */
+.concede-btn {
+  clip-path: none;
+  border-radius: 999px;
+  border-color: var(--danger);
+  color: var(--danger);
+  padding: 4px 14px;
+  font-size: 0.75rem;
+  filter: none;
+}
+
+.concede-btn:hover:not(:disabled) {
+  background: var(--danger);
+  color: var(--bg);
+}
+
 .pointer-bar {
   display: flex;
   flex-wrap: wrap;

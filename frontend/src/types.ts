@@ -108,6 +108,7 @@ export type GameState = {
   stormCount: number;
   phase: string;
   playerTurn: string | null;
+  canUndo: boolean;
   gameOver: boolean;
   isDraw: boolean;
   winnerName: string | null;

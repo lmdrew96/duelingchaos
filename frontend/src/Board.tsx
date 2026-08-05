@@ -857,8 +857,21 @@ export default function Board({ onExit }: { onExit: () => void }) {
         <button className="refresh-btn" onClick={load}>
           refresh
         </button>
+        <button className="ghost" disabled={!state.canUndo} onClick={() => runAction(api.undo)}>
+          undo
+        </button>
         <button className="pass-priority-btn" onClick={() => runAction(api.passPriority)}>
           pass priority
+        </button>
+        <button
+          className="concede-btn"
+          onClick={() => {
+            if (window.confirm('Concede this game? You will lose immediately.')) {
+              runAction(api.concede);
+            }
+          }}
+        >
+          concede
         </button>
       </div>
 

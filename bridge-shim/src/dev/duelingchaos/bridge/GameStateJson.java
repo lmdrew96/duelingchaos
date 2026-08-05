@@ -23,13 +23,14 @@ import java.util.List;
 public final class GameStateJson {
     private GameStateJson() {}
 
-    public static String serialize(GameView game, BridgeGuiGame gui) {
+    public static String serialize(GameView game, BridgeGuiGame gui, boolean canUndo) {
         StringBuilder sb = new StringBuilder();
         sb.append('{');
         field(sb, "turn", game.getTurn()); sb.append(',');
         field(sb, "stormCount", game.getStormCount()); sb.append(',');
         field(sb, "phase", String.valueOf(game.getPhase())); sb.append(',');
         field(sb, "playerTurn", game.getPlayerTurn() == null ? null : game.getPlayerTurn().getLobbyPlayerName()); sb.append(',');
+        field(sb, "canUndo", canUndo); sb.append(',');
         boolean gameOver = game.isGameOver();
         field(sb, "gameOver", gameOver); sb.append(',');
         GameOutcome outcome = gameOver ? game.getOutcome() : null;
