@@ -118,6 +118,10 @@ export type GameState = {
   phase: string;
   playerTurn: string | null;
   canUndo: boolean;
+  // True while the pendingPrompt is the opening-hand Keep/Mulligan decision
+  // — lets the board swap in a dedicated Mulligan panel instead of the
+  // generic yes/no prompt (see BridgeGuiGame.isMulliganPrompt).
+  isMulligan: boolean;
   gameOver: boolean;
   isDraw: boolean;
   winnerName: string | null;

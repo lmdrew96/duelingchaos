@@ -55,8 +55,10 @@ public class BridgeGuiGame extends AbstractGuiGame {
     private volatile String button2Label;
     private volatile boolean button1Enabled;
     private volatile boolean button2Enabled;
+    private volatile boolean isMulliganPrompt;
 
     public String getPromptMessage() { return promptMessage; }
+    public boolean isMulliganPrompt() { return isMulliganPrompt; }
     public String getButton1Label() { return button1Label; }
     public String getButton2Label() { return button2Label; }
     public boolean isButton1Enabled() { return button1Enabled; }
@@ -281,6 +283,17 @@ public class BridgeGuiGame extends AbstractGuiGame {
         button2Label = label2;
         button1Enabled = enable1;
         button2Enabled = enable2;
+        // GameView.isMulligan()/updateIsMulligan() looked like the natural
+        // signal but only covers the London-rule "choose how many cards to
+        // bottom" sub-step (verified via bytecode: only
+        // InputLondonMulligan calls updateIsMulligan — InputConfirmMulligan,
+        // which drives the actual "Do you want to keep your hand?" Keep/
+        // Mulligan decision, never does). InputConfirmMulligan.showMessage()
+        // does call updateButtons with the localizer-resolved "Keep"/
+        // "Mulligan" labels directly (also verified via bytecode), so that
+        // exact pair is the only reliable signal available without deeper
+        // Input-class plumbing.
+        isMulliganPrompt = "Keep".equals(label1) && "Mulligan".equals(label2);
     }
 
     // Generic list-choice hook. Forge reuses this for several distinct

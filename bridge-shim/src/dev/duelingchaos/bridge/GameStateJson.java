@@ -41,6 +41,12 @@ public final class GameStateJson {
         field(sb, "isDraw", isDraw); sb.append(',');
         field(sb, "winnerName", (outcome == null || isDraw || outcome.getWinningLobbyPlayer() == null)
             ? null : outcome.getWinningLobbyPlayer().getName()); sb.append(',');
+        // Lets the frontend render a dedicated "Mulligan?" panel instead of
+        // reusing the generic yes/no prompt for the opening-hand keep/mull
+        // decision. NOT game.isMulligan() — that trackable flag only covers
+        // the separate London-rule bottoming sub-step (see
+        // BridgeGuiGame.updateButtons for why).
+        field(sb, "isMulligan", gui != null && gui.isMulliganPrompt()); sb.append(',');
         sb.append("\"pendingPrompt\":"); writePendingPrompt(sb, gui); sb.append(',');
         sb.append("\"pendingChoice\":"); writePendingChoice(sb, gui); sb.append(',');
         sb.append("\"pointers\":"); writePointers(sb, game); sb.append(',');

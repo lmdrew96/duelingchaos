@@ -166,9 +166,11 @@ function CardBacks({ count }: { count: number }) {
 function StackRail({
   items,
   registerElementRef,
+  onSelect,
 }: {
   items: StackItem[];
   registerElementRef: (key: EntityRef, el: HTMLElement | null) => void;
+  onSelect: (item: StackItem) => void;
 }) {
   if (items.length === 0) return null;
   return (
@@ -182,10 +184,41 @@ function StackRail({
             className={`stack-tile${i === 0 ? ' top' : ''}`}
             title={item.text}
             style={{ zIndex: items.length - i }}
+            onClick={() => onSelect(item)}
           >
             {item.sourceName ?? item.text}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// Click-to-pin companion to the tile's title= hover tooltip — the tooltip is
+// fine for a quick peek, but StackItem.text (the full ability text Forge
+// hands over) is often long enough to want a durable, readable view, same
+// deal as CardDetailModal's hover-preview/click-to-pin split for card tiles.
+function StackItemDetailModal({ item, onClose }: { item: StackItem; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="card-detail-backdrop" onClick={onClose}>
+      <div className="card-detail-panel" onClick={(e) => e.stopPropagation()}>
+        <DecoCorners />
+        <DecoCrown />
+        <button type="button" className="ghost card-detail-close" onClick={onClose}>
+          close
+        </button>
+        <div className="card-detail-header">
+          <span className="card-detail-name">{item.sourceName ?? 'On the stack'}</span>
+        </div>
+        <p className="card-detail-oracle">{item.text}</p>
       </div>
     </div>
   );
@@ -693,6 +726,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
   const [detailCardName, setDetailCardName] = useState<string | null>(null);
   const [hoverCard, setHoverCard] = useState<{ name: string; el: HTMLElement } | null>(null);
   const [graveyardOwnerId, setGraveyardOwnerId] = useState<number | null>(null);
+  const [stackDetailItem, setStackDetailItem] = useState<StackItem | null>(null);
   const [dismissedPointerIds, setDismissedPointerIds] = useState<Set<string>>(new Set());
   const [logOpen, setLogOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -950,7 +984,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
         />
       )}
 
-      <StackRail items={state.stack} registerElementRef={registerElementRef} />
+      <StackRail items={state.stack} registerElementRef={registerElementRef} onSelect={setStackDetailItem} />
 
       {human && (
         <PlayerZone
@@ -981,10 +1015,29 @@ export default function Board({ onExit }: { onExit: () => void }) {
         />
       )}
 
-      {!choice && prompt?.message && (
+      {!choice && prompt?.message && state.isMulligan && (
+        <div className="prompt-panel mulligan-panel">
+          <DecoCorners />
+          <DecoCrown />
+          <h2 className="mulligan-title">Mulligan?</h2>
+          <p className="prompt-message">{prompt.message}</p>
+          <div className="prompt-buttons">
+            {prompt.button1Enabled && (
+              <button onClick={() => runAction(api.selectOk)}>{prompt.button1 || 'Keep'}</button>
+            )}
+            {prompt.button2Enabled && (
+              <button className="ghost" onClick={() => runAction(api.selectCancel)}>
+                {prompt.button2 || 'Mulligan'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!choice && prompt?.message && !state.isMulligan && (
         <div className="prompt-panel">
           <DecoCorners />
-        <DecoCrown />
+          <DecoCrown />
           <p className="prompt-message">{prompt.message}</p>
           <div className="prompt-buttons">
             {prompt.button1Enabled && (
@@ -1030,6 +1083,10 @@ export default function Board({ onExit }: { onExit: () => void }) {
 
       {detailCardName && (
         <CardDetailModal cardName={detailCardName} onClose={() => setDetailCardName(null)} />
+      )}
+
+      {stackDetailItem && (
+        <StackItemDetailModal item={stackDetailItem} onClose={() => setStackDetailItem(null)} />
       )}
 
       {hoverCard && <CardHoverPreview name={hoverCard.name} anchor={hoverCard.el} />}

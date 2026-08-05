@@ -662,6 +662,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   margin-left: -16px;
+  cursor: pointer;
 }
 
 .stack-fan .stack-tile:first-child {
@@ -697,6 +698,13 @@
   display: flex;
   justify-content: center;
   gap: 10px;
+}
+
+.mulligan-title {
+  font-family: var(--serif);
+  font-size: 1.4rem;
+  color: var(--gold);
+  margin: 4px 0 10px;
 }
 
 .game-over-panel {
