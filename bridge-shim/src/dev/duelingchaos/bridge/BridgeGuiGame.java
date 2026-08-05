@@ -475,10 +475,28 @@ public class BridgeGuiGame extends AbstractGuiGame {
     public void setPanelSelection(CardView hostCard) {
     }
 
+    // Reached whenever a single click on a card resolves to more than one
+    // playable SpellAbility — MDFCs (front vs back face), Adventure cards
+    // (cast the Adventure vs the creature), cycling lands (play as land vs
+    // cycle), cards offering both a cast and an activated-ability option.
+    // Same "pick one of N" shape as getChoices/order above, just forced to
+    // exactly one pick since playing more than one ability from one click
+    // isn't a legal outcome.
     @Override
     public SpellAbilityView getAbilityToPlay(CardView hostCard, List<SpellAbilityView> abilities, ITriggerEvent triggerEvent) {
         if (abilities.isEmpty()) {
             return null;
+        }
+        if (abilities.size() == 1) {
+            return abilities.get(0);
+        }
+        List<String> labels = new ArrayList<>();
+        for (SpellAbilityView a : abilities) labels.add(a.getDescription());
+        pendingChoice = PendingChoice.list("Choose ability", labels, 1, 1);
+        String answer = awaitChoiceAnswer();
+        pendingChoice = null;
+        for (int idx : parseIndices(answer)) {
+            if (idx >= 0 && idx < abilities.size()) return abilities.get(idx);
         }
         return abilities.get(0);
     }
