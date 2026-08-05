@@ -10,25 +10,37 @@ import forge.game.Game;
 import forge.game.GameRules;
 import forge.game.GameType;
 import forge.game.Match;
+import forge.game.card.Card;
+import forge.game.card.CardView;
+import forge.game.player.Player;
 import forge.game.player.RegisteredPlayer;
+import forge.game.zone.ZoneType;
 import forge.gui.GuiBase;
 import forge.model.FModel;
 import forge.player.GamePlayerUtil;
+import forge.player.PlayerControllerHuman;
+import forge.player.LobbyPlayerHuman;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
-// Phase 1 spike: proves Forge's internal game state can be read live and
-// serialized to JSON. Both seats are AI (see the handoff brief) — driving
-// a human seat via IGuiGame/PlayerControllerHuman is phase 2 scope.
+// Phase 2 spike: one seat is human-controlled (driven over HTTP), the other
+// is AI. Proves a full turn — playing a land, casting a spell, passing
+// priority — can be piloted with no UI attached at all.
 public class BridgeMain {
     private static volatile Game currentGame;
+    private static volatile PlayerControllerHuman humanController;
+    private static volatile Player humanPlayer;
 
     public static void main(String[] args) throws IOException {
         if (args.length < 2) {
@@ -39,9 +51,9 @@ public class BridgeMain {
         GuiBase.setInterface(new GuiDesktop());
         FModel.initialize(null, null);
 
-        Deck deck1 = DeckSerializer.fromFile(new File(args[0]));
-        Deck deck2 = DeckSerializer.fromFile(new File(args[1]));
-        if (deck1 == null || deck2 == null) {
+        Deck humanDeck = DeckSerializer.fromFile(new File(args[0]));
+        Deck aiDeck = DeckSerializer.fromFile(new File(args[1]));
+        if (humanDeck == null || aiDeck == null) {
             System.err.println("Failed to load one or both deck files");
             System.exit(1);
         }
@@ -51,21 +63,44 @@ public class BridgeMain {
         GameRules rules = new GameRules(GameType.Constructed);
         rules.setAppliedVariants(EnumSet.of(GameType.Constructed));
 
-        RegisteredPlayer rp1 = new RegisteredPlayer(deck1);
-        rp1.setPlayer(GamePlayerUtil.createAiPlayer(deck1.getName(), 0));
-        RegisteredPlayer rp2 = new RegisteredPlayer(deck2);
-        rp2.setPlayer(GamePlayerUtil.createAiPlayer(deck2.getName(), 1));
+        RegisteredPlayer rpHuman = new RegisteredPlayer(humanDeck);
+        rpHuman.setPlayer(new LobbyPlayerHuman("You"));
+        RegisteredPlayer rpAi = new RegisteredPlayer(aiDeck);
+        rpAi.setPlayer(GamePlayerUtil.createAiPlayer(aiDeck.getName(), 1));
 
         List<RegisteredPlayer> players = new ArrayList<>();
-        players.add(rp1);
-        players.add(rp2);
+        players.add(rpHuman);
+        players.add(rpAi);
 
         Match match = new Match(rules, players, "DuelingChaosBridge");
         Game game = match.createGame();
         currentGame = game;
 
+        for (Player p : game.getPlayers()) {
+            if (p.getLobbyPlayer() instanceof LobbyPlayerHuman) {
+                humanPlayer = p;
+                humanController = (PlayerControllerHuman) p.getController();
+                break;
+            }
+        }
+        if (humanController == null) {
+            System.err.println("Failed to locate the human seat's controller");
+            System.exit(1);
+        }
+
+        BridgeGuiGame gui = new BridgeGuiGame();
+        gui.setOriginalGameController(humanPlayer.getView(), humanController);
+        gui.setGameView(game.getView());
+        humanController.setGui(gui);
+        gui.setCurrentPlayer(humanPlayer.getView());
+
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
         server.createContext("/state", BridgeMain::handleState);
+        server.createContext("/action/pass-priority", BridgeMain::handlePassPriority);
+        server.createContext("/action/play-card", BridgeMain::handlePlayCard);
+        server.createContext("/action/tap-land", BridgeMain::handleTapLand);
+        server.createContext("/action/select-ok", exchange -> handleButton(exchange, true));
+        server.createContext("/action/select-cancel", exchange -> handleButton(exchange, false));
         server.setExecutor(null);
         server.start();
         System.out.println("BRIDGE_READY port=" + port);
@@ -84,9 +119,89 @@ public class BridgeMain {
     private static void handleState(HttpExchange exchange) throws IOException {
         Game game = currentGame;
         String json = game == null ? "{}" : GameStateJson.serialize(game.getView());
+        respond(exchange, 200, json);
+    }
+
+    private static void handlePassPriority(HttpExchange exchange) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            respond(exchange, 405, "{\"error\":\"POST only\"}");
+            return;
+        }
+        humanController.passPriority();
+        respond(exchange, 200, "{\"ok\":true}");
+    }
+
+    // Covers non-priority prompts routed through the two generic dialog
+    // buttons (e.g. the opening-hand keep/mulligan choice) rather than
+    // through passPriority/selectCard.
+    private static void handleButton(HttpExchange exchange, boolean ok) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            respond(exchange, 405, "{\"error\":\"POST only\"}");
+            return;
+        }
+        if (ok) {
+            humanController.selectButtonOk();
+        } else {
+            humanController.selectButtonCancel();
+        }
+        respond(exchange, 200, "{\"ok\":true}");
+    }
+
+    // Playing a land and casting a spell are the same click-a-card-in-hand
+    // action from Forge's side (InputProxy figures out what's legal) — one
+    // handler covers both of the patch's named actions. Tapping a land for
+    // mana is the same "click a card" action too, just aimed at the
+    // battlefield instead of the hand — that's what a pending mana-cost
+    // prompt (InputPayMana) is waiting on.
+    private static final Pattern INDEX_FIELD = Pattern.compile("\"index\"\\s*:\\s*(\\d+)");
+
+    private static void handlePlayCard(HttpExchange exchange) throws IOException {
+        handleSelectFromZone(exchange, ZoneType.Hand);
+    }
+
+    private static void handleTapLand(HttpExchange exchange) throws IOException {
+        handleSelectFromZone(exchange, ZoneType.Battlefield);
+    }
+
+    private static void handleSelectFromZone(HttpExchange exchange, ZoneType zone) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            respond(exchange, 405, "{\"error\":\"POST only\"}");
+            return;
+        }
+
+        String body;
+        try (InputStream is = exchange.getRequestBody()) {
+            body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        Matcher m = INDEX_FIELD.matcher(body);
+        if (!m.find()) {
+            respond(exchange, 400, "{\"error\":\"expected JSON body {\\\"index\\\": N}\"}");
+            return;
+        }
+        int index = Integer.parseInt(m.group(1));
+
+        Card target = null;
+        int i = 0;
+        for (Card c : humanPlayer.getCardsIn(zone)) {
+            if (i == index) {
+                target = c;
+                break;
+            }
+            i++;
+        }
+        if (target == null) {
+            respond(exchange, 400, "{\"error\":\"no card at that index in " + zone + "\"}");
+            return;
+        }
+
+        boolean selected = humanController.selectCard(CardView.get(target), Collections.emptyList(), null);
+        respond(exchange, 200, "{\"ok\":" + selected + "}");
+    }
+
+    private static void respond(HttpExchange exchange, int status, String json) throws IOException {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.sendResponseHeaders(200, bytes.length);
+        exchange.sendResponseHeaders(status, bytes.length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(bytes);
         }

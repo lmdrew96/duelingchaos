@@ -10,7 +10,8 @@ const SHIM_BUILD_DIR = path.join(PROJECT_ROOT, 'bridge-shim', 'build');
 const JAVA_PORT = 8787;
 const HTTP_PORT = Number(process.env.PORT) || 4310;
 
-// Phase 1 spike decks — hardcoded until the deckbuilder patch lands.
+// Phase 1/2 spike decks — hardcoded until the deckbuilder patch lands.
+// Seat 1 (human, driven over HTTP) vs seat 2 (AI).
 const DECK1 = 'res/quest/precons/Gruul Goliaths.dck';
 const DECK2 = 'res/quest/precons/Symbiotic Swarm.dck';
 
@@ -43,22 +44,47 @@ function startForgeShim(): Promise<ChildProcessWithoutNullStreams> {
   });
 }
 
+function proxyToShim(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  shimPath: string,
+  method: 'GET' | 'POST',
+): void {
+  const forward = async (): Promise<void> => {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) {
+      chunks.push(chunk as Buffer);
+    }
+    const body = method === 'POST' ? Buffer.concat(chunks) : undefined;
+
+    const upstream = await fetch(`http://127.0.0.1:${JAVA_PORT}${shimPath}`, {
+      method,
+      headers: method === 'POST' ? { 'Content-Type': 'application/json' } : undefined,
+      body,
+    });
+    const responseBody = await upstream.text();
+    res.writeHead(upstream.status, { 'Content-Type': 'application/json' });
+    res.end(responseBody);
+  };
+
+  forward().catch(() => {
+    res.writeHead(502, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Forge shim unreachable' }));
+  });
+}
+
 async function main(): Promise<void> {
   const forgeProcess = await startForgeShim();
   console.log('Forge shim ready.');
 
   const server = http.createServer((req, res) => {
     if (req.url === '/api/game-state' && req.method === 'GET') {
-      fetch(`http://127.0.0.1:${JAVA_PORT}/state`)
-        .then((upstream) => upstream.text())
-        .then((body) => {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(body);
-        })
-        .catch(() => {
-          res.writeHead(502, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Forge shim unreachable' }));
-        });
+      proxyToShim(req, res, '/state', 'GET');
+      return;
+    }
+    if (req.url?.startsWith('/api/action/') && req.method === 'POST') {
+      const shimPath = req.url.replace('/api/action/', '/action/');
+      proxyToShim(req, res, shimPath, 'POST');
       return;
     }
     res.writeHead(404);
