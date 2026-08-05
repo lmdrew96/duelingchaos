@@ -359,7 +359,16 @@ public class BridgeGuiGame extends AbstractGuiGame {
 
     @Override
     public String showInputDialog(String message, String title, FSkinProp icon, String initialInput, List<String> inputOptions, boolean isNumeric) {
-        return initialInput;
+        if (!isNumeric) {
+            // non-numeric free-text input isn't part of this patch's scope
+            // (X-costs are the confirmed numeric case) — keep the old
+            // deterministic default here rather than guessing at a shape.
+            return initialInput;
+        }
+        pendingChoice = PendingChoice.number(message, initialInput);
+        String answer = awaitChoiceAnswer();
+        pendingChoice = null;
+        return answer.isEmpty() ? initialInput : answer;
     }
 
     @Override

@@ -105,6 +105,7 @@ public class BridgeMain {
         server.createContext("/action/select-ok", exchange -> handleButton(exchange, true));
         server.createContext("/action/select-cancel", exchange -> handleButton(exchange, false));
         server.createContext("/action/select-choice", BridgeMain::handleSelectChoice);
+        server.createContext("/action/select-number", BridgeMain::handleSelectNumber);
         DeckboxHandlers.register(server, decksDir);
         server.setExecutor(null);
         server.start();
@@ -160,6 +161,7 @@ public class BridgeMain {
     // prompt (InputPayMana) is waiting on.
     private static final Pattern INDEX_FIELD = Pattern.compile("\"index\"\\s*:\\s*(\\d+)");
     private static final Pattern INDICES_FIELD = Pattern.compile("\"indices\"\\s*:\\s*\\[([^\\]]*)\\]");
+    private static final Pattern VALUE_FIELD = Pattern.compile("\"value\"\\s*:\\s*(-?\\d+)");
 
     // Resolves any pending BridgeGuiGame.PendingChoice of kind "list",
     // "target", or "targets" — all three are answered the same way, by
@@ -180,6 +182,26 @@ public class BridgeMain {
         }
         String answer = m.group(1).replaceAll("\\s+", "");
         boolean ok = gui != null && gui.resolveChoice(answer);
+        respond(exchange, 200, "{\"ok\":" + ok + "}");
+    }
+
+    // Resolves a pending BridgeGuiGame.PendingChoice of kind "number" — the
+    // X-cost / numeric-input prompt.
+    private static void handleSelectNumber(HttpExchange exchange) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            respond(exchange, 405, "{\"error\":\"POST only\"}");
+            return;
+        }
+        String body;
+        try (InputStream is = exchange.getRequestBody()) {
+            body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        Matcher m = VALUE_FIELD.matcher(body);
+        if (!m.find()) {
+            respond(exchange, 400, "{\"error\":\"expected JSON body {\\\"value\\\": N}\"}");
+            return;
+        }
+        boolean ok = gui != null && gui.resolveChoice(m.group(1));
         respond(exchange, 200, "{\"ok\":" + ok + "}");
     }
 
