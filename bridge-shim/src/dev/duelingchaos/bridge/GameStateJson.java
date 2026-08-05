@@ -36,7 +36,7 @@ public final class GameStateJson {
         for (StackItemView s : game.getStack()) {
             if (!first) sb.append(',');
             first = false;
-            sb.append('"').append(escape(s.toString())).append('"');
+            writeStackItem(sb, s);
         }
         sb.append(']');
 
@@ -83,12 +83,57 @@ public final class GameStateJson {
         field(sb, "isNumeric", c.isNumeric); sb.append(',');
         field(sb, "initialInput", c.initialInput); sb.append(',');
         field(sb, "attacker", c.attacker); sb.append(',');
-        field(sb, "damage", c.damage);
+        field(sb, "damage", c.damage); sb.append(',');
+        sb.append("\"refs\":");
+        if (c.refs == null) {
+            sb.append("null");
+        } else {
+            sb.append('[');
+            boolean first = true;
+            for (String ref : c.refs) {
+                if (!first) sb.append(',');
+                first = false;
+                if (ref == null) sb.append("null");
+                else sb.append('"').append(escape(ref)).append('"');
+            }
+            sb.append(']');
+        }
+        sb.append(',');
+        field(sb, "sourceRef", c.sourceRef);
+        sb.append('}');
+    }
+
+    // Each item carries a source (the spell/ability asking) and its already-
+    // declared targets, straight from Forge's own StackItemView — real data,
+    // not a frontend guess, so targeting arrows for resolving spells are
+    // exact. First item from the iterator is treated as top-of-stack (the
+    // next thing to resolve).
+    private static void writeStackItem(StringBuilder sb, StackItemView s) {
+        sb.append('{');
+        field(sb, "id", s.getId()); sb.append(',');
+        CardView src = s.getSourceCard();
+        field(sb, "sourceRef", src == null ? null : "card:" + src.getId()); sb.append(',');
+        field(sb, "sourceName", src == null ? null : src.getCurrentState().getName()); sb.append(',');
+        field(sb, "text", s.toString()); sb.append(',');
+        sb.append("\"targetRefs\":[");
+        boolean first = true;
+        for (CardView t : s.getTargetCards()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append('"').append("card:").append(t.getId()).append('"');
+        }
+        for (PlayerView t : s.getTargetPlayers()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append('"').append("player:").append(t.getId()).append('"');
+        }
+        sb.append(']');
         sb.append('}');
     }
 
     private static void writePlayer(StringBuilder sb, PlayerView p) {
         sb.append('{');
+        field(sb, "id", p.getId()); sb.append(',');
         field(sb, "name", p.getLobbyPlayerName()); sb.append(',');
         field(sb, "life", p.getLife()); sb.append(',');
         field(sb, "isAI", p.isAI()); sb.append(',');
@@ -106,6 +151,7 @@ public final class GameStateJson {
             if (!first) sb.append(',');
             first = false;
             sb.append('{');
+            field(sb, "id", c.getId()); sb.append(',');
             field(sb, "name", c.getCurrentState().getName()); sb.append(',');
             field(sb, "tapped", c.isTapped()); sb.append(',');
             field(sb, "power", c.getCurrentState().getPower()); sb.append(',');

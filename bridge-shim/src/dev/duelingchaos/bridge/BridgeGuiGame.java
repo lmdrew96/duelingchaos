@@ -4,12 +4,14 @@ import forge.LobbyPlayer;
 import forge.deck.CardPool;
 import forge.game.GameEntityView;
 import forge.game.GameState;
+import forge.game.GameView;
 import forge.game.card.CardView;
 import forge.game.phase.PhaseType;
 import forge.game.player.DelayedReveal;
 import forge.game.player.IHasIcon;
 import forge.game.player.PlayerView;
 import forge.game.spellability.SpellAbilityView;
+import forge.game.spellability.StackItemView;
 import forge.gamemodes.match.AbstractGuiGame;
 import forge.gui.interfaces.IGuiGame;
 import forge.item.PaperCard;
@@ -23,6 +25,7 @@ import forge.util.ITriggerEvent;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.SynchronousQueue;
@@ -76,9 +79,21 @@ public class BridgeGuiGame extends AbstractGuiGame {
         public final String initialInput;
         public final String attacker;
         public final int damage;
+        // "card:<id>" / "player:<id>" refs parallel to options — lets the
+        // frontend match a target choice to the actual rendered card/player
+        // tile (by stable Forge id) instead of a display-string guess, so it
+        // can highlight the real element and draw a targeting arrow to it.
+        public final List<String> refs;
+        // Best-effort arrow origin: the top-of-stack item's source card at
+        // the moment a target/targets choice is raised. Forge's target
+        // callbacks don't pass a source, but target declaration happens
+        // immediately after a spell/ability is pushed to the stack, so the
+        // top of stack is normally the thing asking for the target.
+        public final String sourceRef;
 
         private PendingChoice(String kind, String title, List<String> options, int min, int max,
-                boolean optional, boolean isNumeric, String initialInput, String attacker, int damage) {
+                boolean optional, boolean isNumeric, String initialInput, String attacker, int damage,
+                List<String> refs, String sourceRef) {
             this.kind = kind;
             this.title = title;
             this.options = options;
@@ -89,26 +104,28 @@ public class BridgeGuiGame extends AbstractGuiGame {
             this.initialInput = initialInput;
             this.attacker = attacker;
             this.damage = damage;
+            this.refs = refs;
+            this.sourceRef = sourceRef;
         }
 
         static PendingChoice list(String title, List<String> options, int min, int max) {
-            return new PendingChoice("list", title, options, min, max, false, false, null, null, 0);
+            return new PendingChoice("list", title, options, min, max, false, false, null, null, 0, null, null);
         }
 
-        static PendingChoice target(String title, List<String> options, boolean optional) {
-            return new PendingChoice("target", title, options, optional ? 0 : 1, 1, optional, false, null, null, 0);
+        static PendingChoice target(String title, List<String> options, List<String> refs, String sourceRef, boolean optional) {
+            return new PendingChoice("target", title, options, optional ? 0 : 1, 1, optional, false, null, null, 0, refs, sourceRef);
         }
 
-        static PendingChoice targets(String title, List<String> options, int min, int max) {
-            return new PendingChoice("targets", title, options, min, max, min == 0, false, null, null, 0);
+        static PendingChoice targets(String title, List<String> options, List<String> refs, String sourceRef, int min, int max) {
+            return new PendingChoice("targets", title, options, min, max, min == 0, false, null, null, 0, refs, sourceRef);
         }
 
         static PendingChoice number(String title, String initialInput) {
-            return new PendingChoice("number", title, null, 0, 0, false, true, initialInput, null, 0);
+            return new PendingChoice("number", title, null, 0, 0, false, true, initialInput, null, 0, null, null);
         }
 
         static PendingChoice combatDamage(String attacker, List<String> blockerLabels, int damage) {
-            return new PendingChoice("combatDamage", "Assign combat damage", blockerLabels, 0, 0, false, false, null, attacker, damage);
+            return new PendingChoice("combatDamage", "Assign combat damage", blockerLabels, 0, 0, false, false, null, attacker, damage, null, null);
         }
     }
 
@@ -163,6 +180,21 @@ public class BridgeGuiGame extends AbstractGuiGame {
             return ((PlayerView) e).getLobbyPlayerName();
         }
         return String.valueOf(e);
+    }
+
+    private static String entityRef(GameEntityView e) {
+        if (e instanceof CardView) return "card:" + e.getId();
+        if (e instanceof PlayerView) return "player:" + e.getId();
+        return null;
+    }
+
+    private String peekStackSourceRef() {
+        GameView gv = getGameView();
+        if (gv == null) return null;
+        Iterator<StackItemView> it = gv.getStack().iterator();
+        if (!it.hasNext()) return null;
+        CardView src = it.next().getSourceCard();
+        return src == null ? null : "card:" + src.getId();
     }
 
     @Override
@@ -310,8 +342,12 @@ public class BridgeGuiGame extends AbstractGuiGame {
             return optionList.get(0);
         }
         List<String> labels = new ArrayList<>();
-        for (GameEntityView e : optionList) labels.add(entityLabel(e));
-        pendingChoice = PendingChoice.target(title, labels, isOptional);
+        List<String> refs = new ArrayList<>();
+        for (GameEntityView e : optionList) {
+            labels.add(entityLabel(e));
+            refs.add(entityRef(e));
+        }
+        pendingChoice = PendingChoice.target(title, labels, refs, peekStackSourceRef(), isOptional);
         String answer = awaitChoiceAnswer();
         pendingChoice = null;
         List<Integer> indices = parseIndices(answer);
@@ -328,8 +364,12 @@ public class BridgeGuiGame extends AbstractGuiGame {
             return new ArrayList<>();
         }
         List<String> labels = new ArrayList<>();
-        for (GameEntityView e : optionList) labels.add(entityLabel(e));
-        pendingChoice = PendingChoice.targets(title, labels, min, max);
+        List<String> refs = new ArrayList<>();
+        for (GameEntityView e : optionList) {
+            labels.add(entityLabel(e));
+            refs.add(entityRef(e));
+        }
+        pendingChoice = PendingChoice.targets(title, labels, refs, peekStackSourceRef(), min, max);
         String answer = awaitChoiceAnswer();
         pendingChoice = null;
         List<GameEntityView> result = new ArrayList<>();

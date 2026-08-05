@@ -1,9 +1,19 @@
 .board-shell {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 100svh;
   padding: 16px 24px;
   gap: 12px;
+}
+
+.targeting-arrows {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
 }
 
 .board-hud {
@@ -84,6 +94,7 @@
   width: 46px;
   height: 46px;
   flex-shrink: 0;
+  cursor: pointer;
 }
 
 .life-badge-svg {
@@ -172,6 +183,21 @@
   border-color: var(--gold);
 }
 
+.card-tile.targetable {
+  cursor: pointer;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(237, 202, 55, 0.35);
+}
+
+.card-tile.targetable:hover {
+  box-shadow: 0 0 0 2px var(--gold);
+}
+
+.life-badge.targetable {
+  cursor: pointer;
+  filter: drop-shadow(0 0 3px rgba(237, 202, 55, 0.6));
+}
+
 .card-tile-name {
   font-size: 0.72rem;
   line-height: 1.2;
@@ -202,20 +228,46 @@
   );
 }
 
-.stack-strip {
+.stack-rail {
   align-self: center;
-  min-width: 240px;
-  border: 1px solid var(--blue-mid);
-  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font-family: var(--mono);
   font-size: 0.75rem;
   color: var(--text-muted);
-  text-align: center;
 }
 
-.stack-strip .stack-label {
+.stack-rail .stack-label {
   color: var(--gold);
-  margin-right: 8px;
+}
+
+.stack-fan {
+  display: flex;
+}
+
+.stack-tile {
+  width: 120px;
+  padding: 6px 10px;
+  border: 1px solid var(--blue-mid);
+  background: var(--bg-panel);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: -16px;
+}
+
+.stack-fan .stack-tile:first-child {
+  margin-left: 0;
+}
+
+.stack-tile.top {
+  border-color: var(--gold);
+  color: var(--text);
+  background: var(--blue-deep);
 }
 
 .board-divider {
@@ -276,6 +328,13 @@
   font-size: 0.8rem;
   color: var(--text);
   white-space: pre-wrap;
+  margin: 0 0 10px;
+}
+
+.choice-hint {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
   margin: 0 0 10px;
 }
 

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as api from './api';
-import type { BoardCard, GameState, PendingChoice, PlayerState } from './types';
+import type { BoardCard, EntityRef, GameState, PendingChoice, PlayerState, StackItem } from './types';
 import './Board.css';
 
 const POLL_INTERVAL_MS = 1000;
@@ -73,11 +73,24 @@ function DecoCorners() {
   );
 }
 
-function CardTile({ card, index, onClick }: { card: BoardCard; index: number; onClick?: (index: number) => void }) {
+function CardTile({
+  card,
+  index,
+  onClick,
+  targetable,
+  registerRef,
+}: {
+  card: BoardCard;
+  index: number;
+  onClick?: (index: number) => void;
+  targetable?: boolean;
+  registerRef?: (el: HTMLElement | null) => void;
+}) {
   const showPT = card.power !== 0 || card.toughness !== 0;
   return (
     <div
-      className={`card-tile${card.tapped ? ' tapped' : ''}${onClick ? ' clickable' : ''}`}
+      ref={registerRef}
+      className={`card-tile${card.tapped ? ' tapped' : ''}${onClick ? ' clickable' : ''}${targetable ? ' targetable' : ''}`}
       onClick={onClick ? () => onClick(index) : undefined}
     >
       <div className="card-tile-name">{card.name}</div>
@@ -100,21 +113,77 @@ function CardBacks({ count }: { count: number }) {
   );
 }
 
+// The stack resolves LIFO — Forge's own stack iterator returns top-of-stack
+// (the next thing to resolve) first, so that's rendered frontmost/brightest
+// in the fan. Each tile registers under its source card's ref, so the
+// targeting-arrow overlay can anchor an arrow at a freshly-cast spell that
+// hasn't (yet) landed on the battlefield as a permanent.
+function StackRail({
+  items,
+  registerElementRef,
+}: {
+  items: StackItem[];
+  registerElementRef: (key: EntityRef, el: HTMLElement | null) => void;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="stack-rail">
+      <span className="stack-label">stack</span>
+      <div className="stack-fan">
+        {items.map((item, i) => (
+          <div
+            key={item.id}
+            ref={item.sourceRef ? (el) => registerElementRef(item.sourceRef!, el) : undefined}
+            className={`stack-tile${i === 0 ? ' top' : ''}`}
+            title={item.text}
+            style={{ zIndex: items.length - i }}
+          >
+            {item.sourceName ?? item.text}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PlayerZone({
   player,
   faceDownHand,
   onHandClick,
   onBattlefieldClick,
+  targetableRefs,
+  onEntityClick,
+  onEntityFallbackClick,
+  registerElementRef,
 }: {
   player: PlayerState;
   faceDownHand: boolean;
   onHandClick?: (index: number) => void;
   onBattlefieldClick?: (index: number) => void;
+  targetableRefs?: Set<EntityRef>;
+  onEntityClick?: (ref: EntityRef) => void;
+  // Spell-cast targeting (no pendingChoice involved — see api.selectEntity)
+  // has no advance list of valid targets, so any card/player is clickable
+  // as a "maybe this is legal" attempt; Forge silently no-ops an illegal one.
+  onEntityFallbackClick?: (ref: EntityRef) => void;
+  registerElementRef: (key: EntityRef, el: HTMLElement | null) => void;
 }) {
+  const playerRef: EntityRef = `player:${player.id}`;
+  const playerTargetable = targetableRefs?.has(playerRef) ?? false;
   return (
     <div className={`board-zone${faceDownHand ? ' opponent-zone' : ''}`}>
       <div className="player-row">
-        <div className={`life-badge${faceDownHand ? ' opponent' : ''}`}>
+        <div
+          ref={(el) => registerElementRef(playerRef, el)}
+          className={`life-badge${faceDownHand ? ' opponent' : ''}${playerTargetable ? ' targetable' : ''}`}
+          onClick={
+            playerTargetable
+              ? () => onEntityClick?.(playerRef)
+              : onEntityFallbackClick
+                ? () => onEntityFallbackClick(playerRef)
+                : undefined
+          }
+        >
           <LifeBadgeOrnament opponent={faceDownHand} />
           <span className="life-value">{player.life}</span>
         </div>
@@ -125,9 +194,21 @@ function PlayerZone({
         </span>
       </div>
       <div className="card-row">
-        {player.battlefield.map((c, i) => (
-          <CardTile card={c} index={i} onClick={onBattlefieldClick} key={`${c.name}-${i}`} />
-        ))}
+        {player.battlefield.map((c, i) => {
+          const ref: EntityRef = `card:${c.id}`;
+          const targetable = targetableRefs?.has(ref) ?? false;
+          const fallbackClick = onEntityFallbackClick ? () => onEntityFallbackClick(ref) : undefined;
+          return (
+            <CardTile
+              card={c}
+              index={i}
+              onClick={targetable ? () => onEntityClick?.(ref) : (onBattlefieldClick ?? fallbackClick)}
+              targetable={targetable}
+              registerRef={(el) => registerElementRef(ref, el)}
+              key={ref}
+            />
+          );
+        })}
       </div>
       <div className="board-divider" />
       <div className="card-row">
@@ -150,17 +231,21 @@ function PlayerZone({
 function ChoicePanel({
   choice,
   onResolve,
+  selected,
+  onToggle,
+  boardIsPicker,
 }: {
   choice: PendingChoice;
   onResolve: (values: number[]) => void;
+  selected: number[];
+  onToggle: (i: number) => void;
+  boardIsPicker: boolean;
 }) {
   const options = choice.options ?? [];
-  const [selected, setSelected] = useState<number[]>([]);
   const [numberValue, setNumberValue] = useState(choice.initialInput ?? '0');
   const [amounts, setAmounts] = useState<number[]>(() => options.map(() => 0));
 
   useEffect(() => {
-    setSelected([]);
     setNumberValue(choice.initialInput ?? '0');
     setAmounts(options.map(() => 0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -220,45 +305,37 @@ function ChoicePanel({
   }
 
   // list | target | targets
-  const isSingle = choice.kind === 'target';
-  const max = isSingle ? 1 : choice.max || options.length;
+  const max = choice.kind === 'target' ? 1 : choice.max || options.length;
   const valid = selected.length >= choice.min && selected.length <= max;
-  const toggle = (i: number) => {
-    if (isSingle) {
-      setSelected([i]);
-      return;
-    }
-    setSelected((prev) => {
-      if (prev.includes(i)) return prev.filter((x) => x !== i);
-      if (prev.length >= max) return prev;
-      return [...prev, i];
-    });
-  };
   const allPips = choice.kind === 'list' && options.length > 0 && options.every((o) => manaPipClass(o));
 
   return (
     <div className="choice-panel">
       <DecoCorners />
       <p className="choice-title">{choice.title}</p>
-      <div className={allPips ? 'choice-pips' : 'choice-options'}>
-        {options.map((label, i) => {
-          const pipClass = allPips ? manaPipClass(label) : null;
-          return (
-            <button
-              key={i}
-              className={
-                pipClass
-                  ? `choice-pip ${pipClass}${selected.includes(i) ? ' selected' : ''}`
-                  : `choice-option${selected.includes(i) ? ' selected' : ''}`
-              }
-              title={label}
-              onClick={() => toggle(i)}
-            >
-              {pipClass ? '' : label}
-            </button>
-          );
-        })}
-      </div>
+      {boardIsPicker ? (
+        <p className="choice-hint">Click a highlighted target on the board.</p>
+      ) : (
+        <div className={allPips ? 'choice-pips' : 'choice-options'}>
+          {options.map((label, i) => {
+            const pipClass = allPips ? manaPipClass(label) : null;
+            return (
+              <button
+                key={i}
+                className={
+                  pipClass
+                    ? `choice-pip ${pipClass}${selected.includes(i) ? ' selected' : ''}`
+                    : `choice-option${selected.includes(i) ? ' selected' : ''}`
+                }
+                title={label}
+                onClick={() => onToggle(i)}
+              >
+                {pipClass ? '' : label}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="choice-footer">
         <button disabled={!valid} onClick={() => onResolve(selected)}>
           Confirm
@@ -273,10 +350,23 @@ function ChoicePanel({
   );
 }
 
+type Arrow = { x1: number; y1: number; x2: number; y2: number; dashed: boolean };
+
 export default function Board() {
   const [state, setState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [arrows, setArrows] = useState<Arrow[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Maps "card:<id>" / "player:<id>" to its rendered element — populated by
+  // ref callbacks on CardTile/life-badge/stack-tile as they mount, read back
+  // after each commit to compute arrow endpoints and target-click hit areas.
+  const elementRefs = useRef<Map<EntityRef, HTMLElement>>(new Map());
+  const registerElementRef = (key: EntityRef, el: HTMLElement | null) => {
+    if (el) elementRefs.current.set(key, el);
+    else elementRefs.current.delete(key);
+  };
 
   const load = () => {
     api
@@ -308,6 +398,56 @@ export default function Board() {
     }
   };
 
+  const pendingChoice = state?.pendingChoice ?? null;
+  const choiceKey = pendingChoice
+    ? `${pendingChoice.kind}|${pendingChoice.title}|${(pendingChoice.options ?? []).join(',')}`
+    : null;
+  useEffect(() => {
+    setSelected([]);
+  }, [choiceKey]);
+
+  // Recomputed every render after commit: confirmed targets already on the
+  // stack (solid arrows, real data straight from Forge's StackItemView) plus
+  // a tentative arrow for whatever's currently selected in a live target
+  // choice (dashed, cleared on Confirm since the choice disappears).
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container || !state) {
+      setArrows([]);
+      return;
+    }
+    const containerRect = container.getBoundingClientRect();
+    const specs: { from: EntityRef; to: EntityRef; dashed: boolean }[] = [];
+    for (const item of state.stack) {
+      if (!item.sourceRef) continue;
+      for (const t of item.targetRefs) specs.push({ from: item.sourceRef, to: t, dashed: false });
+    }
+    const choice = state.pendingChoice;
+    if (choice?.sourceRef && choice.refs && (choice.kind === 'target' || choice.kind === 'targets')) {
+      for (const i of selected) {
+        const ref = choice.refs[i];
+        if (ref) specs.push({ from: choice.sourceRef, to: ref, dashed: true });
+      }
+    }
+    const next: Arrow[] = [];
+    for (const spec of specs) {
+      const fromEl = elementRefs.current.get(spec.from);
+      const toEl = elementRefs.current.get(spec.to);
+      if (!fromEl || !toEl) continue;
+      const fr = fromEl.getBoundingClientRect();
+      const tr = toEl.getBoundingClientRect();
+      next.push({
+        x1: fr.left + fr.width / 2 - containerRect.left,
+        y1: fr.top + fr.height / 2 - containerRect.top,
+        x2: tr.left + tr.width / 2 - containerRect.left,
+        y2: tr.top + tr.height / 2 - containerRect.top,
+        dashed: spec.dashed,
+      });
+    }
+    setArrows(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, selected]);
+
   if (error) {
     return (
       <div className="board-shell">
@@ -326,6 +466,33 @@ export default function Board() {
   const prompt = state.pendingPrompt;
   const choice = state.pendingChoice;
 
+  const isTargetChoice = choice != null && (choice.kind === 'target' || choice.kind === 'targets');
+  // The board itself is the picker only when every option resolved to a
+  // real ref — if any came back null (an entity type entityRef() doesn't
+  // recognize), fall back to the panel's text list so nothing's unreachable.
+  const boardIsPicker = isTargetChoice && !!choice!.refs && choice!.refs.every((r) => r != null);
+  const targetableRefs = new Set<EntityRef>(boardIsPicker ? (choice!.refs!.filter(Boolean) as EntityRef[]) : []);
+  const max = choice ? (choice.kind === 'target' ? 1 : choice.max || (choice.options?.length ?? 0)) : 0;
+
+  const toggleSelected = (i: number) => {
+    if (!choice) return;
+    if (choice.kind === 'target') {
+      setSelected([i]);
+      return;
+    }
+    setSelected((prev) => {
+      if (prev.includes(i)) return prev.filter((x) => x !== i);
+      if (prev.length >= max) return prev;
+      return [...prev, i];
+    });
+  };
+
+  const onEntityClick = (ref: EntityRef) => {
+    if (!choice?.refs) return;
+    const idx = choice.refs.indexOf(ref);
+    if (idx >= 0) toggleSelected(idx);
+  };
+
   const resolveChoice = (values: number[]) => {
     if (!choice) return;
     if (choice.kind === 'number') {
@@ -338,7 +505,7 @@ export default function Board() {
   };
 
   return (
-    <div className="board-shell">
+    <div className="board-shell" ref={containerRef}>
       <div className="board-hud">
         <span>turn {state.turn}</span>
         <span>{state.phase}</span>
@@ -351,25 +518,41 @@ export default function Board() {
         </button>
       </div>
 
-      {opponent && <PlayerZone player={opponent} faceDownHand />}
-
-      {state.stack.length > 0 && (
-        <div className="stack-strip">
-          <span className="stack-label">stack</span>
-          {state.stack.join(' · ')}
-        </div>
+      {opponent && (
+        <PlayerZone
+          player={opponent}
+          faceDownHand
+          targetableRefs={targetableRefs}
+          onEntityClick={onEntityClick}
+          onEntityFallbackClick={choice ? undefined : (ref) => runAction(() => api.selectEntity(ref))}
+          registerElementRef={registerElementRef}
+        />
       )}
+
+      <StackRail items={state.stack} registerElementRef={registerElementRef} />
 
       {human && (
         <PlayerZone
           player={human}
           faceDownHand={false}
-          onHandClick={(index) => runAction(() => api.playCard(index))}
-          onBattlefieldClick={(index) => runAction(() => api.tapLand(index))}
+          onHandClick={choice ? undefined : (index) => runAction(() => api.playCard(index))}
+          onBattlefieldClick={choice ? undefined : (index) => runAction(() => api.tapLand(index))}
+          targetableRefs={targetableRefs}
+          onEntityClick={onEntityClick}
+          onEntityFallbackClick={choice ? undefined : (ref) => runAction(() => api.selectEntity(ref))}
+          registerElementRef={registerElementRef}
         />
       )}
 
-      {choice && <ChoicePanel choice={choice} onResolve={resolveChoice} />}
+      {choice && (
+        <ChoicePanel
+          choice={choice}
+          onResolve={resolveChoice}
+          selected={selected}
+          onToggle={toggleSelected}
+          boardIsPicker={boardIsPicker}
+        />
+      )}
 
       {!choice && prompt?.message && (
         <div className="prompt-panel">
@@ -386,6 +569,29 @@ export default function Board() {
             )}
           </div>
         </div>
+      )}
+
+      {arrows.length > 0 && (
+        <svg className="targeting-arrows">
+          <defs>
+            <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="var(--gold)" />
+            </marker>
+          </defs>
+          {arrows.map((a, i) => (
+            <line
+              key={i}
+              x1={a.x1}
+              y1={a.y1}
+              x2={a.x2}
+              y2={a.y2}
+              stroke="var(--gold)"
+              strokeWidth={2}
+              strokeDasharray={a.dashed ? '6 5' : undefined}
+              markerEnd="url(#arrowhead)"
+            />
+          ))}
+        </svg>
       )}
     </div>
   );

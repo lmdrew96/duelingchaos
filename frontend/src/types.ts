@@ -22,6 +22,7 @@ export type Legality = {
 };
 
 export type BoardCard = {
+  id: number;
   name: string;
   tapped: boolean;
   power: number;
@@ -29,6 +30,7 @@ export type BoardCard = {
 };
 
 export type PlayerState = {
+  id: number;
   name: string;
   life: number;
   isAI: boolean;
@@ -36,6 +38,19 @@ export type PlayerState = {
   battlefield: BoardCard[];
   graveyard: BoardCard[];
   libraryCount: number;
+};
+
+// "card:<id>" | "player:<id>" — matches BoardCard.id / PlayerState.id so an
+// entity offered as a target/source can be resolved to its actual rendered
+// tile instead of guessed from a display string.
+export type EntityRef = string;
+
+export type StackItem = {
+  id: number;
+  sourceRef: EntityRef | null;
+  sourceName: string | null;
+  text: string;
+  targetRefs: EntityRef[];
 };
 
 export type PendingPrompt = {
@@ -59,6 +74,8 @@ export type PendingChoice = {
   initialInput: string | null;
   attacker: string | null;
   damage: number;
+  refs: (EntityRef | null)[] | null;
+  sourceRef: EntityRef | null;
 };
 
 export type GameState = {
@@ -69,5 +86,5 @@ export type GameState = {
   pendingPrompt: PendingPrompt;
   pendingChoice: PendingChoice | null;
   players: PlayerState[];
-  stack: string[];
+  stack: StackItem[];
 };

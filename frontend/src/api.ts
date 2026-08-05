@@ -1,4 +1,4 @@
-import type { CardInfo, DeckCard, DeckSummary, DecksList, GameState, Legality } from './types';
+import type { CardInfo, DeckCard, DeckSummary, DecksList, EntityRef, GameState, Legality } from './types';
 
 const BASE = '/api';
 
@@ -80,3 +80,9 @@ export const selectChoice = (indices: number[]): Promise<void> =>
 export const selectNumber = (value: number): Promise<void> => postAction('select-number', { value });
 export const assignDamage = (amounts: number[]): Promise<void> =>
   postAction('assign-damage', { amounts });
+
+// Spell-cast target declaration doesn't go through pendingChoice at all —
+// it's the same click-a-card mechanism as playCard/tapLand, just reaching
+// beyond the human player's own zones (an opponent's creature, or a player
+// directly) via the same "card:<id>" / "player:<id>" ref scheme.
+export const selectEntity = (ref: EntityRef): Promise<void> => postAction('select-entity', { ref });

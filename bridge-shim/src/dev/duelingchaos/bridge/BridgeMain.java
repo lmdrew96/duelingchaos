@@ -107,6 +107,7 @@ public class BridgeMain {
         server.createContext("/action/select-choice", BridgeMain::handleSelectChoice);
         server.createContext("/action/select-number", BridgeMain::handleSelectNumber);
         server.createContext("/action/assign-damage", BridgeMain::handleAssignDamage);
+        server.createContext("/action/select-entity", BridgeMain::handleSelectEntity);
         DeckboxHandlers.register(server, decksDir);
         server.setExecutor(null);
         server.start();
@@ -164,6 +165,7 @@ public class BridgeMain {
     private static final Pattern INDICES_FIELD = Pattern.compile("\"indices\"\\s*:\\s*\\[([^\\]]*)\\]");
     private static final Pattern VALUE_FIELD = Pattern.compile("\"value\"\\s*:\\s*(-?\\d+)");
     private static final Pattern AMOUNTS_FIELD = Pattern.compile("\"amounts\"\\s*:\\s*\\[([^\\]]*)\\]");
+    private static final Pattern REF_FIELD = Pattern.compile("\"ref\"\\s*:\\s*\"(card|player):(\\d+)\"");
 
     // Resolves any pending BridgeGuiGame.PendingChoice of kind "list",
     // "target", or "targets" — all three are answered the same way, by
@@ -226,6 +228,59 @@ public class BridgeMain {
         String answer = m.group(1).replaceAll("\\s+", "");
         boolean ok = gui != null && gui.resolveChoice(answer);
         respond(exchange, 200, "{\"ok\":" + ok + "}");
+    }
+
+    // Spell/ability target declaration during casting doesn't go through
+    // BridgeGuiGame.chooseSingleEntityForEffect at all — confirmed live: it
+    // routes through the same click-a-card mechanism as play-card/tap-land
+    // (Forge's InputSelectTargets accepts a selectCard/selectPlayer call).
+    // Those existing endpoints only reach the human player's own zones
+    // though, so this one resolves a "card:<id>" / "player:<id>" ref (the
+    // same EntityRef scheme game-state JSON already exposes) across BOTH
+    // players' battlefields, for targeting an opponent's creature or either
+    // player directly.
+    private static void handleSelectEntity(HttpExchange exchange) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            respond(exchange, 405, "{\"error\":\"POST only\"}");
+            return;
+        }
+        String body;
+        try (InputStream is = exchange.getRequestBody()) {
+            body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        Matcher m = REF_FIELD.matcher(body);
+        if (!m.find()) {
+            respond(exchange, 400, "{\"error\":\"expected JSON body {\\\"ref\\\": \\\"card:<id>\\\" | \\\"player:<id>\\\"}\"}");
+            return;
+        }
+        String kind = m.group(1);
+        int id = Integer.parseInt(m.group(2));
+        Game game = currentGame;
+        if (game == null) {
+            respond(exchange, 400, "{\"error\":\"no game in progress\"}");
+            return;
+        }
+        if ("player".equals(kind)) {
+            for (Player p : game.getPlayers()) {
+                if (p.getView().getId() == id) {
+                    humanController.selectPlayer(p.getView(), null);
+                    respond(exchange, 200, "{\"ok\":true}");
+                    return;
+                }
+            }
+            respond(exchange, 404, "{\"error\":\"no player with that id\"}");
+            return;
+        }
+        for (Player p : game.getPlayers()) {
+            for (Card c : p.getCardsIn(ZoneType.Battlefield)) {
+                if (c.getId() == id) {
+                    boolean ok = humanController.selectCard(CardView.get(c), Collections.emptyList(), null);
+                    respond(exchange, 200, "{\"ok\":" + ok + "}");
+                    return;
+                }
+            }
+        }
+        respond(exchange, 404, "{\"error\":\"no battlefield card with that id\"}");
     }
 
     private static void handlePlayCard(HttpExchange exchange) throws IOException {
