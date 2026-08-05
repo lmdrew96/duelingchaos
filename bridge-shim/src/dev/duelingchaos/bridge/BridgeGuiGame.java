@@ -396,6 +396,16 @@ public class BridgeGuiGame extends AbstractGuiGame {
     public void updateShards(Iterable<PlayerView> players) {
     }
 
+    // Forge's real sideboarding UI (offer the sideboard pool, let the player
+    // swap cards in/out) only makes sense between games of a multi-game
+    // match, and BridgeMain runs exactly one match.createGame()/startGame()
+    // per process — every match here is a single game, so this is never
+    // actually reached in the current architecture. Declining the swap and
+    // keeping the main deck as-is is the correct, safe behavior for that —
+    // NOT a stand-in that silently drops player intent, since there's no
+    // player-facing sideboard UI in this client to have expressed any.
+    // Building a real swap prompt would need a best-of-3 match loop first
+    // (see the "Sideboarding support" ChaosPatch scoping decision).
     @Override
     public List<PaperCard> sideboard(CardPool sideboard, CardPool main, String message) {
         return new ArrayList<>(main.toFlatList());
