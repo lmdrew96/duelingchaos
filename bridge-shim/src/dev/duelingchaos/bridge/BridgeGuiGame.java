@@ -208,9 +208,13 @@ public class BridgeGuiGame extends AbstractGuiGame {
         if (choices.isEmpty()) {
             return new ArrayList<>();
         }
-        if (choices.size() <= Math.max(min, 0)) {
-            // no real freedom — must take every option to satisfy min
-            return new ArrayList<>(choices);
+        if (choices.size() <= Math.max(min, 0) || display == null) {
+            // no real freedom, or (e.g. AbstractGuiGame.reveal()'s
+            // "here's what the AI skipped" informational reveal) no way to
+            // label the options for a human — fall back to the old
+            // deterministic default rather than crash on a null display fn.
+            int count = Math.max(min, 0);
+            return new ArrayList<>(choices.subList(0, Math.min(count, choices.size())));
         }
         List<String> labels = new ArrayList<>();
         for (T c : choices) labels.add(display.apply(c));
