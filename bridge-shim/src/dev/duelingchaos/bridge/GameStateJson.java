@@ -1,11 +1,13 @@
 package dev.duelingchaos.bridge;
 
 import forge.card.CardTypeView;
+import forge.card.MagicColor;
 import forge.card.mana.ManaCost;
 import forge.game.GameEntityView;
 import forge.game.GameOutcome;
 import forge.game.GameView;
 import forge.game.card.CardView;
+import forge.game.card.CounterEnumType;
 import forge.game.combat.CombatView;
 import forge.game.phase.PhaseType;
 import forge.game.player.PlayerView;
@@ -25,6 +27,7 @@ public final class GameStateJson {
         StringBuilder sb = new StringBuilder();
         sb.append('{');
         field(sb, "turn", game.getTurn()); sb.append(',');
+        field(sb, "stormCount", game.getStormCount()); sb.append(',');
         field(sb, "phase", String.valueOf(game.getPhase())); sb.append(',');
         field(sb, "playerTurn", game.getPlayerTurn() == null ? null : game.getPlayerTurn().getLobbyPlayerName()); sb.append(',');
         boolean gameOver = game.isGameOver();
@@ -251,11 +254,30 @@ public final class GameStateJson {
         field(sb, "name", p.getLobbyPlayerName()); sb.append(',');
         field(sb, "life", p.getLife()); sb.append(',');
         field(sb, "isAI", p.isAI()); sb.append(',');
+        field(sb, "poison", p.getCounters(CounterEnumType.POISON)); sb.append(',');
+        field(sb, "energy", p.getCounters(CounterEnumType.ENERGY)); sb.append(',');
+        field(sb, "experience", p.getCounters(CounterEnumType.EXPERIENCE)); sb.append(',');
+        field(sb, "manaPool", manaPoolCost(p)); sb.append(',');
         sb.append("\"hand\":"); writeCards(sb, p.getHand()); sb.append(',');
         sb.append("\"battlefield\":"); writeCards(sb, p.getBattlefield()); sb.append(',');
         sb.append("\"graveyard\":"); writeCards(sb, p.getGraveyard()); sb.append(',');
         sb.append("\"libraryCount\":").append(p.getZoneSize(ZoneType.Library));
         sb.append('}');
+    }
+
+    // Rendered as a plain {W}{U}... mana-cost string rather than a
+    // structured {color,amount} list so the frontend can reuse its existing
+    // ManaPips cost-string renderer as-is for the floating pool too.
+    private static String manaPoolCost(PlayerView p) {
+        StringBuilder mana = new StringBuilder();
+        for (byte color : MagicColor.WUBRGC) {
+            int amount = p.getMana(color);
+            String code = MagicColor.toShortString(color);
+            for (int i = 0; i < amount; i++) {
+                mana.append('{').append(code).append('}');
+            }
+        }
+        return mana.toString();
     }
 
     private static void writeCards(StringBuilder sb, FCollectionView<CardView> cards) {

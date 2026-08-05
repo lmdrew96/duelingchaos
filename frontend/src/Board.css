@@ -188,6 +188,12 @@
   color: var(--text-muted);
 }
 
+/* Poison gets the danger tone — unlike library/graveyard, it's a second
+   loss condition (10 poison = dead) worth flagging as it climbs. */
+.counter-chip.poison {
+  color: var(--danger);
+}
+
 .zone-count-btn {
   clip-path: none;
   border: none;

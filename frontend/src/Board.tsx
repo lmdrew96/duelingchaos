@@ -247,7 +247,15 @@ function PlayerZone({
           >
             graveyard {player.graveyard.length}
           </button>
+          {/* Poison/energy/experience are relevant to only a handful of
+              archetypes (infect, energy decks, planeswalker-heavy commander)
+              — shown only when actually in play so most games don't carry
+              three permanently-zero counters in the HUD. */}
+          {player.poison > 0 && <span className="counter-chip poison">poison {player.poison}</span>}
+          {player.energy > 0 && <span className="counter-chip">energy {player.energy}</span>}
+          {player.experience > 0 && <span className="counter-chip">experience {player.experience}</span>}
         </span>
+        {player.manaPool && <ManaPips cost={player.manaPool} size="sm" />}
       </div>
       {/* A single wrapping div, not one flex child per group — .opponent-zone
           reverses flex-direction so the opponent's hand renders near the
@@ -845,6 +853,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
         <span>turn {state.turn}</span>
         <span>{state.phase}</span>
         <span>{state.playerTurn ?? '—'}</span>
+        {state.stormCount > 0 && <span>storm {state.stormCount}</span>}
         <button className="refresh-btn" onClick={load}>
           refresh
         </button>

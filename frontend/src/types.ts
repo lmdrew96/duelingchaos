@@ -38,6 +38,12 @@ export type PlayerState = {
   name: string;
   life: number;
   isAI: boolean;
+  poison: number;
+  energy: number;
+  experience: number;
+  // Floating mana pool as a {W}{U}... cost string (empty when nothing's
+  // floating) — reuses ManaPips' existing cost-string renderer as-is.
+  manaPool: string;
   hand: BoardCard[];
   battlefield: BoardCard[];
   graveyard: BoardCard[];
@@ -99,6 +105,7 @@ export type CombatState = { attackers: CombatAttacker[]; blocks: CombatBlock[] }
 
 export type GameState = {
   turn: number;
+  stormCount: number;
   phase: string;
   playerTurn: string | null;
   gameOver: boolean;
