@@ -12,13 +12,14 @@ import forge.util.collect.FCollectionView;
 public final class GameStateJson {
     private GameStateJson() {}
 
-    public static String serialize(GameView game) {
+    public static String serialize(GameView game, BridgeGuiGame gui) {
         StringBuilder sb = new StringBuilder();
         sb.append('{');
         field(sb, "turn", game.getTurn()); sb.append(',');
         field(sb, "phase", String.valueOf(game.getPhase())); sb.append(',');
         field(sb, "playerTurn", game.getPlayerTurn() == null ? null : game.getPlayerTurn().getLobbyPlayerName()); sb.append(',');
         field(sb, "gameOver", game.isGameOver()); sb.append(',');
+        sb.append("\"pendingPrompt\":"); writePendingPrompt(sb, gui); sb.append(',');
 
         sb.append("\"players\":[");
         boolean first = true;
@@ -40,6 +41,16 @@ public final class GameStateJson {
 
         sb.append('}');
         return sb.toString();
+    }
+
+    private static void writePendingPrompt(StringBuilder sb, BridgeGuiGame gui) {
+        sb.append('{');
+        field(sb, "message", gui == null ? null : gui.getPromptMessage()); sb.append(',');
+        field(sb, "button1", gui == null ? null : gui.getButton1Label()); sb.append(',');
+        field(sb, "button2", gui == null ? null : gui.getButton2Label()); sb.append(',');
+        field(sb, "button1Enabled", gui != null && gui.isButton1Enabled()); sb.append(',');
+        field(sb, "button2Enabled", gui != null && gui.isButton2Enabled());
+        sb.append('}');
     }
 
     private static void writePlayer(StringBuilder sb, PlayerView p) {

@@ -55,3 +55,20 @@ export async function fetchGameState(): Promise<GameState> {
   if (!res.ok) throw new Error('failed to fetch game state');
   return res.json();
 }
+
+async function postAction(path: string, body?: object): Promise<void> {
+  await fetch(`${BASE}/action/${path}`, {
+    method: 'POST',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+export const passPriority = (): Promise<void> => postAction('pass-priority');
+export const selectOk = (): Promise<void> => postAction('select-ok');
+export const selectCancel = (): Promise<void> => postAction('select-cancel');
+// Same underlying "click a card" selection Forge uses for casting a spell,
+// playing a land, AND answering a card-selection prompt (e.g. cleanup
+// discard) — InputProxy figures out what the click means server-side.
+export const playCard = (index: number): Promise<void> => postAction('play-card', { index });
+export const tapLand = (index: number): Promise<void> => postAction('tap-land', { index });

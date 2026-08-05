@@ -38,11 +38,20 @@ export type PlayerState = {
   libraryCount: number;
 };
 
+export type PendingPrompt = {
+  message: string | null;
+  button1: string | null;
+  button2: string | null;
+  button1Enabled: boolean;
+  button2Enabled: boolean;
+};
+
 export type GameState = {
   turn: number;
   phase: string;
   playerTurn: string | null;
   gameOver: boolean;
+  pendingPrompt: PendingPrompt;
   players: PlayerState[];
   stack: string[];
 };

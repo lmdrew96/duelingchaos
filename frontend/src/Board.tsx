@@ -1,16 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as api from './api';
 import type { BoardCard, GameState, PlayerState } from './types';
 import './Board.css';
 
-// Phase 3: prove the render works off a GET /api/game-state snapshot. No
-// clicking, no polling loop — that's phase 4 (live state + actions). A
-// manual refresh button re-fetches for convenience while testing; it's not
-// a game action.
-function CardTile({ card }: { card: BoardCard }) {
+const POLL_INTERVAL_MS = 1000;
+
+function CardTile({ card, index, onClick }: { card: BoardCard; index: number; onClick?: (index: number) => void }) {
   const showPT = card.power !== 0 || card.toughness !== 0;
   return (
-    <div className={`card-tile${card.tapped ? ' tapped' : ''}`}>
+    <div
+      className={`card-tile${card.tapped ? ' tapped' : ''}${onClick ? ' clickable' : ''}`}
+      onClick={onClick ? () => onClick(index) : undefined}
+    >
       <div className="card-tile-name">{card.name}</div>
       {showPT && (
         <div className="card-tile-pt">
@@ -31,7 +32,17 @@ function CardBacks({ count }: { count: number }) {
   );
 }
 
-function PlayerZone({ player, faceDownHand }: { player: PlayerState; faceDownHand: boolean }) {
+function PlayerZone({
+  player,
+  faceDownHand,
+  onHandClick,
+  onBattlefieldClick,
+}: {
+  player: PlayerState;
+  faceDownHand: boolean;
+  onHandClick?: (index: number) => void;
+  onBattlefieldClick?: (index: number) => void;
+}) {
   return (
     <div className={`board-zone${faceDownHand ? ' opponent-zone' : ''}`}>
       <div className="player-row">
@@ -46,7 +57,7 @@ function PlayerZone({ player, faceDownHand }: { player: PlayerState; faceDownHan
       </div>
       <div className="card-row">
         {player.battlefield.map((c, i) => (
-          <CardTile card={c} key={`${c.name}-${i}`} />
+          <CardTile card={c} index={i} onClick={onBattlefieldClick} key={`${c.name}-${i}`} />
         ))}
       </div>
       <div className="board-divider" />
@@ -54,7 +65,9 @@ function PlayerZone({ player, faceDownHand }: { player: PlayerState; faceDownHan
         {faceDownHand ? (
           <CardBacks count={player.hand.length} />
         ) : (
-          player.hand.map((c, i) => <CardTile card={c} key={`${c.name}-${i}`} />)
+          player.hand.map((c, i) => (
+            <CardTile card={c} index={i} onClick={onHandClick} key={`${c.name}-${i}`} />
+          ))
         )}
       </div>
     </div>
@@ -64,6 +77,7 @@ function PlayerZone({ player, faceDownHand }: { player: PlayerState; faceDownHan
 export default function Board() {
   const [state, setState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
 
   const load = () => {
     api
@@ -75,7 +89,25 @@ export default function Board() {
       .catch(() => setError('Could not reach the bridge — is the game running?'));
   };
 
-  useEffect(load, []);
+  useEffect(() => {
+    load();
+    const handle = setInterval(load, POLL_INTERVAL_MS);
+    return () => clearInterval(handle);
+  }, []);
+
+  // Re-poll right after an action instead of waiting for the next tick, so
+  // clicks feel responsive. inFlight guards against a slow action + the
+  // next poll tick both landing and stepping on each other.
+  const runAction = async (action: () => Promise<void>) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    try {
+      await action();
+      load();
+    } finally {
+      inFlight.current = false;
+    }
+  };
 
   if (error) {
     return (
@@ -92,6 +124,7 @@ export default function Board() {
 
   const human = state.players.find((p) => !p.isAI) ?? state.players[0];
   const opponent = state.players.find((p) => p.isAI) ?? state.players[1];
+  const prompt = state.pendingPrompt;
 
   return (
     <div className="board-shell">
@@ -101,6 +134,9 @@ export default function Board() {
         <span>{state.playerTurn ?? '—'}</span>
         <button className="refresh-btn" onClick={load}>
           refresh
+        </button>
+        <button className="refresh-btn" onClick={() => runAction(api.passPriority)}>
+          pass priority
         </button>
       </div>
 
@@ -113,7 +149,30 @@ export default function Board() {
         </div>
       )}
 
-      {human && <PlayerZone player={human} faceDownHand={false} />}
+      {human && (
+        <PlayerZone
+          player={human}
+          faceDownHand={false}
+          onHandClick={(index) => runAction(() => api.playCard(index))}
+          onBattlefieldClick={(index) => runAction(() => api.tapLand(index))}
+        />
+      )}
+
+      {prompt?.message && (
+        <div className="prompt-panel">
+          <p className="prompt-message">{prompt.message}</p>
+          <div className="prompt-buttons">
+            {prompt.button1Enabled && (
+              <button onClick={() => runAction(api.selectOk)}>{prompt.button1}</button>
+            )}
+            {prompt.button2Enabled && (
+              <button className="ghost" onClick={() => runAction(api.selectCancel)}>
+                {prompt.button2}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

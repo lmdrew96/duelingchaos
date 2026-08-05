@@ -110,6 +110,14 @@
   opacity: 0.6;
 }
 
+.card-tile.clickable {
+  cursor: pointer;
+}
+
+.card-tile.clickable:hover {
+  border-color: var(--gold);
+}
+
 .card-tile-name {
   font-size: 0.72rem;
   line-height: 1.2;
@@ -161,4 +169,28 @@
 .board-divider {
   border-top: 1px solid var(--blue-mid);
   margin: 4px 0;
+}
+
+.prompt-panel {
+  align-self: center;
+  max-width: 520px;
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  padding: 12px 18px;
+  text-align: center;
+}
+
+.prompt-message {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text);
+  white-space: pre-wrap;
+  margin: 0 0 10px;
+}
+
+.prompt-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
 }

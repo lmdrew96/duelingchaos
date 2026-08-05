@@ -38,6 +38,24 @@ import java.util.Map;
 // each is a candidate for a real HTTP prompt endpoint once we hit it.
 public class BridgeGuiGame extends AbstractGuiGame {
 
+    // Surfaces what Forge is waiting on for the human seat so the frontend
+    // can render it instead of the game silently hanging — e.g. the
+    // opening-hand mulligan choice routes through updateButtons' two
+    // generic dialog buttons plus a showPromptMessage description, not
+    // through confirm()/showConfirmDialog() (those stay auto-answered,
+    // see the class-level comment below).
+    private volatile String promptMessage;
+    private volatile String button1Label;
+    private volatile String button2Label;
+    private volatile boolean button1Enabled;
+    private volatile boolean button2Enabled;
+
+    public String getPromptMessage() { return promptMessage; }
+    public String getButton1Label() { return button1Label; }
+    public String getButton2Label() { return button2Label; }
+    public boolean isButton1Enabled() { return button1Enabled; }
+    public boolean isButton2Enabled() { return button2Enabled; }
+
     @Override
     protected void updateCurrentPlayer(PlayerView player) {
         // no-op: single fixed perspective, nothing to switch
@@ -65,6 +83,10 @@ public class BridgeGuiGame extends AbstractGuiGame {
 
     @Override
     public void updateButtons(PlayerView owner, String label1, String label2, boolean enable1, boolean enable2, boolean focus1) {
+        button1Label = label1;
+        button2Label = label2;
+        button1Enabled = enable1;
+        button2Enabled = enable2;
     }
 
     @Override
@@ -173,6 +195,7 @@ public class BridgeGuiGame extends AbstractGuiGame {
     @Override
     public void showPromptMessage(PlayerView player, String message, CardView referenceCard) {
         System.out.println("[gui prompt] " + player + ": " + message);
+        promptMessage = message;
     }
 
     @Override

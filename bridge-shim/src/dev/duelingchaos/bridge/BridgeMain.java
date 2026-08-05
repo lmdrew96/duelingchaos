@@ -41,6 +41,7 @@ public class BridgeMain {
     private static volatile Game currentGame;
     private static volatile PlayerControllerHuman humanController;
     private static volatile Player humanPlayer;
+    private static volatile BridgeGuiGame gui;
 
     public static void main(String[] args) throws IOException {
         if (args.length < 2) {
@@ -89,11 +90,12 @@ public class BridgeMain {
             System.exit(1);
         }
 
-        BridgeGuiGame gui = new BridgeGuiGame();
-        gui.setOriginalGameController(humanPlayer.getView(), humanController);
-        gui.setGameView(game.getView());
-        humanController.setGui(gui);
-        gui.setCurrentPlayer(humanPlayer.getView());
+        BridgeGuiGame newGui = new BridgeGuiGame();
+        newGui.setOriginalGameController(humanPlayer.getView(), humanController);
+        newGui.setGameView(game.getView());
+        humanController.setGui(newGui);
+        newGui.setCurrentPlayer(humanPlayer.getView());
+        gui = newGui;
 
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
         server.createContext("/state", BridgeMain::handleState);
@@ -120,7 +122,7 @@ public class BridgeMain {
 
     private static void handleState(HttpExchange exchange) throws IOException {
         Game game = currentGame;
-        String json = game == null ? "{}" : GameStateJson.serialize(game.getView());
+        String json = game == null ? "{}" : GameStateJson.serialize(game.getView(), gui);
         respond(exchange, 200, json);
     }
 
