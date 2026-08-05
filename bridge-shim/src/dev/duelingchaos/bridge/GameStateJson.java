@@ -2,9 +2,11 @@ package dev.duelingchaos.bridge;
 
 import forge.card.CardTypeView;
 import forge.card.mana.ManaCost;
+import forge.game.GameEntityView;
 import forge.game.GameOutcome;
 import forge.game.GameView;
 import forge.game.card.CardView;
+import forge.game.combat.CombatView;
 import forge.game.phase.PhaseType;
 import forge.game.player.PlayerView;
 import forge.game.spellability.StackItemView;
@@ -35,6 +37,7 @@ public final class GameStateJson {
         sb.append("\"pendingPrompt\":"); writePendingPrompt(sb, gui); sb.append(',');
         sb.append("\"pendingChoice\":"); writePendingChoice(sb, gui); sb.append(',');
         sb.append("\"pointers\":"); writePointers(sb, game); sb.append(',');
+        sb.append("\"combat\":"); writeCombat(sb, game); sb.append(',');
 
         sb.append("\"players\":[");
         boolean first = true;
@@ -164,6 +167,54 @@ public final class GameStateJson {
             sb.append('}');
         }
         sb.append(']');
+    }
+
+    // CombatView is the same trackable, thread-safe snapshot layer as every
+    // other *View class here — unlike CombatUtil.canAttack/canBlock (which
+    // take live Card/Game objects and would race the forge-game-thread if
+    // called from this HTTP-served serialize path), this only ever reads
+    // already-declared attackers/blockers. No precomputed "legal to attack/
+    // block" set: same as spell-cast targeting elsewhere in this file, the
+    // frontend offers the click and Forge silently no-ops an illegal one.
+    private static void writeCombat(StringBuilder sb, GameView game) {
+        CombatView combat = game.getCombat();
+        if (combat == null) {
+            sb.append("null");
+            return;
+        }
+        sb.append('{');
+        sb.append("\"attackers\":[");
+        boolean first = true;
+        for (CardView attacker : combat.getAttackers()) {
+            if (!first) sb.append(',');
+            first = false;
+            GameEntityView defender = combat.getDefender(attacker);
+            sb.append('{');
+            field(sb, "attackerRef", "card:" + attacker.getId()); sb.append(',');
+            field(sb, "defenderRef", defender == null ? null : entityRef(defender));
+            sb.append('}');
+        }
+        sb.append("],");
+        sb.append("\"blocks\":[");
+        first = true;
+        for (CardView attacker : combat.getAttackers()) {
+            for (CardView blocker : combat.getBlockers(attacker)) {
+                if (!first) sb.append(',');
+                first = false;
+                sb.append('{');
+                field(sb, "blockerRef", "card:" + blocker.getId()); sb.append(',');
+                field(sb, "attackerRef", "card:" + attacker.getId());
+                sb.append('}');
+            }
+        }
+        sb.append(']');
+        sb.append('}');
+    }
+
+    private static String entityRef(GameEntityView e) {
+        if (e instanceof CardView) return "card:" + e.getId();
+        if (e instanceof PlayerView) return "player:" + e.getId();
+        return null;
     }
 
     // Each item carries a source (the spell/ability asking) and its already-

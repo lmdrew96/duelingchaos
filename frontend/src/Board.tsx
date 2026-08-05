@@ -67,6 +67,8 @@ function CardTile({
   onInfoClick,
   onHoverStart,
   onHoverEnd,
+  attacking,
+  blocking,
 }: {
   card: BoardCard;
   index: number;
@@ -76,12 +78,14 @@ function CardTile({
   onInfoClick?: (name: string) => void;
   onHoverStart?: (name: string, el: HTMLElement) => void;
   onHoverEnd?: () => void;
+  attacking?: boolean;
+  blocking?: boolean;
 }) {
   const showPT = card.power !== 0 || card.toughness !== 0;
   return (
     <div
       ref={registerRef}
-      className={`card-tile${card.tapped ? ' tapped' : ''}${onClick ? ' clickable' : ''}${targetable ? ' targetable' : ''}`}
+      className={`card-tile${card.tapped ? ' tapped' : ''}${onClick ? ' clickable' : ''}${targetable ? ' targetable' : ''}${attacking ? ' attacking' : ''}${blocking ? ' blocking' : ''}`}
       onClick={onClick ? () => onClick(index) : undefined}
       onMouseEnter={onHoverStart ? (e) => onHoverStart(card.name, e.currentTarget) : undefined}
       onMouseLeave={onHoverEnd}
@@ -100,6 +104,11 @@ function CardTile({
         >
           i
         </button>
+      )}
+      {(attacking || blocking) && (
+        <span className={`card-tile-combat-badge${attacking ? ' attacking' : ' blocking'}`}>
+          {attacking ? 'ATK' : 'BLK'}
+        </span>
       )}
       <div className="card-tile-name">{card.name}</div>
       {card.manaCost && (
@@ -185,6 +194,8 @@ function PlayerZone({
   onHoverStart,
   onHoverEnd,
   onGraveyardClick,
+  attackingRefs,
+  blockingRefs,
 }: {
   player: PlayerState;
   faceDownHand: boolean;
@@ -201,6 +212,8 @@ function PlayerZone({
   onHoverStart?: (name: string, el: HTMLElement) => void;
   onHoverEnd?: () => void;
   onGraveyardClick?: () => void;
+  attackingRefs?: Set<EntityRef>;
+  blockingRefs?: Set<EntityRef>;
 }) {
   const playerRef: EntityRef = `player:${player.id}`;
   const playerTargetable = targetableRefs?.has(playerRef) ?? false;
@@ -264,6 +277,8 @@ function PlayerZone({
                       onInfoClick={onInfoClick}
                       onHoverStart={onHoverStart}
                       onHoverEnd={onHoverEnd}
+                      attacking={attackingRefs?.has(ref) ?? false}
+                      blocking={blockingRefs?.has(ref) ?? false}
                       key={ref}
                     />
                   );
@@ -591,7 +606,7 @@ function PointerBar({
   );
 }
 
-type Arrow = { x1: number; y1: number; x2: number; y2: number; dashed: boolean };
+type Arrow = { x1: number; y1: number; x2: number; y2: number; dashed: boolean; kind: 'target' | 'attack' | 'block' };
 
 function GameOverScreen({
   isDraw,
@@ -715,16 +730,24 @@ export default function Board({ onExit }: { onExit: () => void }) {
       return;
     }
     const containerRect = container.getBoundingClientRect();
-    const specs: { from: EntityRef; to: EntityRef; dashed: boolean }[] = [];
+    const specs: { from: EntityRef; to: EntityRef; dashed: boolean; kind: Arrow['kind'] }[] = [];
     for (const item of state.stack) {
       if (!item.sourceRef) continue;
-      for (const t of item.targetRefs) specs.push({ from: item.sourceRef, to: t, dashed: false });
+      for (const t of item.targetRefs) specs.push({ from: item.sourceRef, to: t, dashed: false, kind: 'target' });
     }
     const choice = state.pendingChoice;
     if (choice?.sourceRef && choice.refs && (choice.kind === 'target' || choice.kind === 'targets')) {
       for (const i of selected) {
         const ref = choice.refs[i];
-        if (ref) specs.push({ from: choice.sourceRef, to: ref, dashed: true });
+        if (ref) specs.push({ from: choice.sourceRef, to: ref, dashed: true, kind: 'target' });
+      }
+    }
+    if (state.combat) {
+      for (const a of state.combat.attackers) {
+        if (a.defenderRef) specs.push({ from: a.attackerRef, to: a.defenderRef, dashed: false, kind: 'attack' });
+      }
+      for (const b of state.combat.blocks) {
+        specs.push({ from: b.blockerRef, to: b.attackerRef, dashed: false, kind: 'block' });
       }
     }
     const next: Arrow[] = [];
@@ -740,6 +763,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
         x2: tr.left + tr.width / 2 - containerRect.left,
         y2: tr.top + tr.height / 2 - containerRect.top,
         dashed: spec.dashed,
+        kind: spec.kind,
       });
     }
     setArrows(next);
@@ -771,6 +795,9 @@ export default function Board({ onExit }: { onExit: () => void }) {
   const boardIsPicker = isTargetChoice && !!choice!.refs && choice!.refs.every((r) => r != null);
   const targetableRefs = new Set<EntityRef>(boardIsPicker ? (choice!.refs!.filter(Boolean) as EntityRef[]) : []);
   const max = choice ? (choice.kind === 'target' ? 1 : choice.max || (choice.options?.length ?? 0)) : 0;
+
+  const attackingRefs = new Set<EntityRef>(state.combat?.attackers.map((a) => a.attackerRef) ?? []);
+  const blockingRefs = new Set<EntityRef>(state.combat?.blocks.map((b) => b.blockerRef) ?? []);
 
   const toggleSelected = (i: number) => {
     if (!choice) return;
@@ -836,6 +863,8 @@ export default function Board({ onExit }: { onExit: () => void }) {
           onHoverStart={(name, el) => setHoverCard({ name, el })}
           onHoverEnd={() => setHoverCard(null)}
           onGraveyardClick={() => setGraveyardOwnerId(opponent.id)}
+          attackingRefs={attackingRefs}
+          blockingRefs={blockingRefs}
         />
       )}
 
@@ -855,6 +884,8 @@ export default function Board({ onExit }: { onExit: () => void }) {
           onHoverStart={(name, el) => setHoverCard({ name, el })}
           onHoverEnd={() => setHoverCard(null)}
           onGraveyardClick={() => setGraveyardOwnerId(human.id)}
+          attackingRefs={attackingRefs}
+          blockingRefs={blockingRefs}
         />
       )}
 
@@ -889,8 +920,14 @@ export default function Board({ onExit }: { onExit: () => void }) {
       {arrows.length > 0 && (
         <svg className="targeting-arrows">
           <defs>
-            <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <marker id="arrowhead-target" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
               <path d="M0,0 L8,4 L0,8 Z" fill="var(--gold)" />
+            </marker>
+            <marker id="arrowhead-attack" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="var(--danger)" />
+            </marker>
+            <marker id="arrowhead-block" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+              <path d="M0,0 L8,4 L0,8 Z" fill="var(--text-muted)" />
             </marker>
           </defs>
           {arrows.map((a, i) => (
@@ -900,10 +937,10 @@ export default function Board({ onExit }: { onExit: () => void }) {
               y1={a.y1}
               x2={a.x2}
               y2={a.y2}
-              stroke="var(--gold)"
+              stroke={a.kind === 'attack' ? 'var(--danger)' : a.kind === 'block' ? 'var(--text-muted)' : 'var(--gold)'}
               strokeWidth={2}
               strokeDasharray={a.dashed ? '6 5' : undefined}
-              markerEnd="url(#arrowhead)"
+              markerEnd={`url(#arrowhead-${a.kind})`}
             />
           ))}
         </svg>

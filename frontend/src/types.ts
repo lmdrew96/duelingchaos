@@ -87,6 +87,12 @@ export type PendingChoice = {
 // have; see GameStateJson.writePointers.
 export type PointerInfo = { id: string; message: string };
 
+// Declared attackers/blockers only — no precomputed "legal to attack/block"
+// set (see GameStateJson.writeCombat). Null outside combat.
+export type CombatAttacker = { attackerRef: EntityRef; defenderRef: EntityRef | null };
+export type CombatBlock = { blockerRef: EntityRef; attackerRef: EntityRef };
+export type CombatState = { attackers: CombatAttacker[]; blocks: CombatBlock[] };
+
 export type GameState = {
   turn: number;
   phase: string;
@@ -97,6 +103,7 @@ export type GameState = {
   pendingPrompt: PendingPrompt;
   pendingChoice: PendingChoice | null;
   pointers: PointerInfo[];
+  combat: CombatState | null;
   players: PlayerState[];
   stack: StackItem[];
 };

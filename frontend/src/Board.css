@@ -321,6 +321,37 @@
   filter: drop-shadow(0 0 3px rgba(237, 202, 55, 0.6));
 }
 
+.card-tile.attacking {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 2px rgba(217, 118, 90, 0.4);
+}
+
+.card-tile.blocking {
+  border-color: var(--text-muted);
+  box-shadow: 0 0 0 2px rgba(150, 194, 205, 0.35);
+}
+
+.card-tile-combat-badge {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  z-index: 1;
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: 2px;
+  color: var(--bg);
+}
+
+.card-tile-combat-badge.attacking {
+  background: var(--danger);
+}
+
+.card-tile-combat-badge.blocking {
+  background: var(--text-muted);
+}
+
 .card-tile-name {
   font-size: 0.72rem;
   line-height: 1.2;
