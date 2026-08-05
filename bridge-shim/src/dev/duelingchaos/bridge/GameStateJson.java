@@ -2,6 +2,7 @@ package dev.duelingchaos.bridge;
 
 import forge.card.CardTypeView;
 import forge.card.mana.ManaCost;
+import forge.game.GameOutcome;
 import forge.game.GameView;
 import forge.game.card.CardView;
 import forge.game.phase.PhaseType;
@@ -24,7 +25,13 @@ public final class GameStateJson {
         field(sb, "turn", game.getTurn()); sb.append(',');
         field(sb, "phase", String.valueOf(game.getPhase())); sb.append(',');
         field(sb, "playerTurn", game.getPlayerTurn() == null ? null : game.getPlayerTurn().getLobbyPlayerName()); sb.append(',');
-        field(sb, "gameOver", game.isGameOver()); sb.append(',');
+        boolean gameOver = game.isGameOver();
+        field(sb, "gameOver", gameOver); sb.append(',');
+        GameOutcome outcome = gameOver ? game.getOutcome() : null;
+        boolean isDraw = outcome != null && outcome.isDraw();
+        field(sb, "isDraw", isDraw); sb.append(',');
+        field(sb, "winnerName", (outcome == null || isDraw || outcome.getWinningLobbyPlayer() == null)
+            ? null : outcome.getWinningLobbyPlayer().getName()); sb.append(',');
         sb.append("\"pendingPrompt\":"); writePendingPrompt(sb, gui); sb.append(',');
         sb.append("\"pendingChoice\":"); writePendingChoice(sb, gui); sb.append(',');
         sb.append("\"pointers\":"); writePointers(sb, game); sb.append(',');

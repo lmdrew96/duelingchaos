@@ -92,6 +92,8 @@ export type GameState = {
   phase: string;
   playerTurn: string | null;
   gameOver: boolean;
+  isDraw: boolean;
+  winnerName: string | null;
   pendingPrompt: PendingPrompt;
   pendingChoice: PendingChoice | null;
   pointers: PointerInfo[];

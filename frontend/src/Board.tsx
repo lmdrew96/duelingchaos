@@ -593,7 +593,35 @@ function PointerBar({
 
 type Arrow = { x1: number; y1: number; x2: number; y2: number; dashed: boolean };
 
-export default function Board() {
+function GameOverScreen({
+  isDraw,
+  winnerName,
+  human,
+  onExit,
+}: {
+  isDraw: boolean;
+  winnerName: string | null;
+  human?: PlayerState;
+  onExit: () => void;
+}) {
+  const won = !isDraw && winnerName != null && human != null && winnerName === human.name;
+  const headline = isDraw ? 'Draw' : won ? 'Victory' : 'Defeat';
+  return (
+    <div className="card-detail-backdrop">
+      <div className="prompt-panel game-over-panel">
+        <DecoCorners />
+        <DecoCrown />
+        <p className={`game-over-headline${won ? ' won' : isDraw ? '' : ' lost'}`}>{headline}</p>
+        {!isDraw && winnerName && <p className="prompt-message">{winnerName} wins the game.</p>}
+        <div className="prompt-buttons">
+          <button onClick={onExit}>Back to deckbuilder</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Board({ onExit }: { onExit: () => void }) {
   const [state, setState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
@@ -613,12 +641,21 @@ export default function Board() {
     else elementRefs.current.delete(key);
   };
 
+  const pollHandle = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const load = () => {
     api
       .fetchGameState()
       .then((s) => {
         setState(s);
         setError(null);
+        // The bridge keeps the finished game view alive after gameOver, but
+        // there's nothing left worth polling for — stop hitting the API
+        // once the win/loss screen takes over.
+        if (s.gameOver && pollHandle.current != null) {
+          clearInterval(pollHandle.current);
+          pollHandle.current = null;
+        }
         // A board refresh can unmount the tile currently under the cursor
         // (e.g. a card changing zones) without ever firing onMouseLeave —
         // drop the stale hover if its anchor is no longer in the document,
@@ -639,8 +676,10 @@ export default function Board() {
 
   useEffect(() => {
     load();
-    const handle = setInterval(load, POLL_INTERVAL_MS);
-    return () => clearInterval(handle);
+    pollHandle.current = setInterval(load, POLL_INTERVAL_MS);
+    return () => {
+      if (pollHandle.current != null) clearInterval(pollHandle.current);
+    };
   }, []);
 
   // Re-poll right after an action instead of waiting for the next tick, so
@@ -884,6 +923,10 @@ export default function Board() {
             <GraveyardModal playerName={owner.name} cards={owner.graveyard} onClose={() => setGraveyardOwnerId(null)} />
           );
         })()}
+
+      {state.gameOver && (
+        <GameOverScreen isDraw={state.isDraw} winnerName={state.winnerName} human={human} onExit={onExit} />
+      )}
     </div>
   );
 }

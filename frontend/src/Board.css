@@ -590,6 +590,26 @@
   gap: 10px;
 }
 
+.game-over-panel {
+  max-width: 420px;
+}
+
+.game-over-headline {
+  font-family: var(--serif);
+  font-size: 2.2rem;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+  margin: 4px 0 10px;
+}
+
+.game-over-headline.won {
+  color: var(--ok);
+}
+
+.game-over-headline.lost {
+  color: var(--danger);
+}
+
 .choice-panel {
   position: relative;
   align-self: center;

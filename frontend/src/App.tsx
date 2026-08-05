@@ -23,7 +23,7 @@ function App() {
           Board
         </button>
       </nav>
-      {view === 'deckbuilder' ? <Deckbuilder /> : <Board />}
+      {view === 'deckbuilder' ? <Deckbuilder /> : <Board onExit={() => setView('deckbuilder')} />}
     </>
   );
 }
