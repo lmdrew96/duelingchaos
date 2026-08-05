@@ -10,7 +10,10 @@ export type CardInfo = {
 
 export type CardSearchResult = { cards: CardInfo[]; truncated: boolean };
 
-export type DeckCard = { name: string; count: number };
+// Undefined/omitted means 'main' — existing saved decks predate this field
+// and load with no section at all.
+export type DeckCardSection = 'commander' | 'sideboard';
+export type DeckCard = { name: string; count: number; section?: DeckCardSection };
 
 export type DeckSummary = { name: string; deckSize: number; cards: DeckCard[] };
 

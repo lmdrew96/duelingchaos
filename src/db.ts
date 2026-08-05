@@ -47,7 +47,9 @@ export function ensureSchema(): Promise<void> {
   return schemaReady;
 }
 
-export type StoredDeckCard = { name: string; count: number };
+// Undefined/omitted means 'main' — existing saved decks predate this field
+// and load with no section at all.
+export type StoredDeckCard = { name: string; count: number; section?: 'commander' | 'sideboard' };
 
 export async function listSavedDeckNames(userId: string): Promise<string[]> {
   await ensureSchema();

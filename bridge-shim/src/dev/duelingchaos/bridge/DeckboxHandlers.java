@@ -182,19 +182,48 @@ public final class DeckboxHandlers {
         String formatName = query.getOrDefault("format", "Standard");
 
         String body = readBody(exchange);
-        CardPool pool = parseDecklist(body);
+        CardPool mainPool = parseDecklist(stripSectionLines(body, null));
+        CardPool commanderPool = parseDecklist(stripSectionLines(body, "CMDR"));
+        CardPool sideboardPool = parseDecklist(stripSectionLines(body, "SB"));
 
         GameFormat format = FModel.getFormats().getFormat(formatName);
         DeckFormat structuralFormat = structuralFormatFor(format);
 
         Deck deck = new Deck("Legality Check");
-        deck.putSection(forge.deck.DeckSection.Main, pool);
+        deck.putSection(forge.deck.DeckSection.Main, mainPool);
+        if (!commanderPool.isEmpty()) deck.putSection(forge.deck.DeckSection.Commander, commanderPool);
+        if (!sideboardPool.isEmpty()) deck.putSection(forge.deck.DeckSection.Sideboard, sideboardPool);
         deck.setDeckFormat(structuralFormat);
 
         String structuralProblem = structuralFormat.getDeckConformanceProblem(deck);
         String banlistProblem = format == null ? null : format.getDeckConformanceProblem(deck);
 
-        respond(exchange, 200, CardDbJson.serializeLegality(pool.countAll(), structuralProblem, banlistProblem));
+        int deckSize = mainPool.countAll() + commanderPool.countAll();
+        respond(exchange, 200, CardDbJson.serializeLegality(deckSize, structuralProblem, banlistProblem));
+    }
+
+    // toDecklistText (frontend/src/api.ts) tags a card's line with a trailing
+    // " {CMDR}"/" {SB}" marker for the commander/side-deck sections; this
+    // pulls out just the lines matching the given marker (or, for
+    // marker == null, the plain untagged Main-section lines), stripping the
+    // marker itself so the result is plain "N Name" text CardPool.fromCardList
+    // can parse directly.
+    private static String stripSectionLines(String body, String marker) {
+        StringBuilder sb = new StringBuilder();
+        String suffix = marker == null ? null : " {" + marker + "}";
+        for (String rawLine : body.split("\n")) {
+            String line = rawLine.trim();
+            if (line.isEmpty()) continue;
+            boolean isCmdr = line.endsWith(" {CMDR}");
+            boolean isSb = line.endsWith(" {SB}");
+            if (marker == null) {
+                if (isCmdr || isSb) continue;
+                sb.append(line).append('\n');
+            } else if (suffix != null && line.endsWith(suffix)) {
+                sb.append(line, 0, line.length() - suffix.length()).append('\n');
+            }
+        }
+        return sb.toString();
     }
 
     // The selected format is a GameFormat (banlist/legal-sets — a separate

@@ -137,7 +137,8 @@ function DeckbuilderCore({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deckCards, cardInfoCache]);
 
-  const deckSize = deckCards.reduce((sum, c) => sum + c.count, 0);
+  // Sideboard cards aren't part of the deck actually being played.
+  const deckSize = deckCards.filter((c) => c.section !== 'sideboard').reduce((sum, c) => sum + c.count, 0);
 
   // Lets the search results list show "already in this deck" counts without
   // an O(results × deckCards) scan per render.
@@ -147,9 +148,14 @@ function DeckbuilderCore({
     return counts;
   }, [deckCards]);
 
+  const commanderCard = deckCards.find((c) => c.section === 'commander');
+  const mainCards = deckCards.filter((c) => !c.section);
+  const sideboardCards = deckCards.filter((c) => c.section === 'sideboard');
+
   const manaCurve = useMemo(() => {
     const buckets = new Array(CURVE_BUCKETS).fill(0);
     for (const dc of deckCards) {
+      if (dc.section === 'sideboard') continue;
       const info = cardInfoCache[dc.name];
       if (!info || info.type.includes('Land')) continue;
       buckets[Math.min(manaValue(info.manaCost), CURVE_BUCKETS - 1)] += dc.count;
@@ -160,6 +166,7 @@ function DeckbuilderCore({
   const colorCounts = useMemo(() => {
     const counts: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
     for (const dc of deckCards) {
+      if (dc.section === 'sideboard') continue;
       const info = cardInfoCache[dc.name];
       if (!info || info.type.includes('Land')) continue;
       if (!info.colors) {
@@ -194,6 +201,25 @@ function DeckbuilderCore({
 
   const removeCard = (name: string) => {
     setDeckCards((prev) => prev.filter((c) => c.name !== name));
+  };
+
+  // Only one commander at a time — assigning a new one clears the old.
+  // Commander is always a singleton, so the count is pinned to 1.
+  const setCommander = (name: string) => {
+    setDeckCards((prev) =>
+      prev.map((c) => {
+        if (c.name === name) {
+          return c.section === 'commander' ? { ...c, section: undefined } : { ...c, section: 'commander', count: 1 };
+        }
+        return c.section === 'commander' ? { ...c, section: undefined } : c;
+      }),
+    );
+  };
+
+  const toggleSideboard = (name: string) => {
+    setDeckCards((prev) =>
+      prev.map((c) => (c.name === name ? { ...c, section: c.section === 'sideboard' ? undefined : 'sideboard' } : c)),
+    );
   };
 
   const startNewDeck = () => {
@@ -231,6 +257,37 @@ function DeckbuilderCore({
     refreshDecksList();
     setStatusMessage(`Deleted "${name}".`);
   };
+
+  const renderDeckRow = (c: DeckCard) => (
+    <div className="deck-row" key={c.name}>
+      <CardArt name={c.name} variant="crop" className="deck-row-art" />
+      <span className="deck-row-name">{c.name}</span>
+      <div className="count-controls">
+        <button onClick={() => adjustCount(c.name, -1)}>−</button>
+        <span className="count-value">{c.count}</span>
+        <button onClick={() => adjustCount(c.name, 1)}>+</button>
+        <button className="ghost" onClick={() => removeCard(c.name)}>
+          ✕
+        </button>
+      </div>
+      <div className="assign-controls">
+        <button
+          className={`ghost assign-btn${c.section === 'commander' ? ' active' : ''}`}
+          onClick={() => setCommander(c.name)}
+          title="Set as commander"
+        >
+          CMDR
+        </button>
+        <button
+          className={`ghost assign-btn${c.section === 'sideboard' ? ' active' : ''}`}
+          onClick={() => toggleSideboard(c.name)}
+          title="Move to side deck"
+        >
+          SB
+        </button>
+      </div>
+    </div>
+  );
 
   const filteredPresets = decksList.presets.filter((n) =>
     n.toLowerCase().includes(loadFilter.toLowerCase()),
@@ -299,22 +356,24 @@ function DeckbuilderCore({
             <span className="deck-size">{deckSize}</span>
           </div>
           <div className="deck-list">
-            {deckCards.map((c) => (
-              <div className="deck-row" key={c.name}>
-                <CardArt name={c.name} variant="crop" className="deck-row-art" />
-                <span className="deck-row-name">{c.name}</span>
-                <div className="count-controls">
-                  <button onClick={() => adjustCount(c.name, -1)}>−</button>
-                  <span className="count-value">{c.count}</span>
-                  <button onClick={() => adjustCount(c.name, 1)}>+</button>
-                  <button className="ghost" onClick={() => removeCard(c.name)}>
-                    ✕
-                  </button>
-                </div>
-              </div>
-            ))}
-            {deckCards.length === 0 && (
+            {commanderCard && (
+              <>
+                <p className="deck-section-header">Commander</p>
+                {renderDeckRow(commanderCard)}
+              </>
+            )}
+            <p className="deck-section-header">Main deck ({mainCards.reduce((s, c) => s + c.count, 0)})</p>
+            {mainCards.map(renderDeckRow)}
+            {mainCards.length === 0 && !commanderCard && (
               <p className="empty-hint">Search for cards or load a deck to get started.</p>
+            )}
+            {sideboardCards.length > 0 && (
+              <>
+                <p className="deck-section-header">
+                  Side deck ({sideboardCards.reduce((s, c) => s + c.count, 0)})
+                </p>
+                {sideboardCards.map(renderDeckRow)}
+              </>
             )}
           </div>
 

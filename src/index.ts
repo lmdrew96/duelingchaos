@@ -98,11 +98,18 @@ async function restartMatch(deck1: string, deck2: string): Promise<void> {
 // new match just overwrites the last one's file.
 const HUMAN_DECKLIST_PATH = path.join(DECKS_DIR, 'tmp-match.decklist.txt');
 
+// Sideboard cards are deliberately not part of the deck being played, so
+// they're dropped here — Forge's CardPool.fromCardList (which parses this
+// file) only ever sees Main/Commander cards, as plain "N Name" lines with no
+// section marker.
 function writeHumanDecklist(cards: StoredDeckCard[]): string {
   if (!fs.existsSync(DECKS_DIR)) {
     fs.mkdirSync(DECKS_DIR, { recursive: true });
   }
-  const text = cards.map((c) => `${c.count} ${c.name}`).join('\n');
+  const text = cards
+    .filter((c) => c.section !== 'sideboard')
+    .map((c) => `${c.count} ${c.name}`)
+    .join('\n');
   fs.writeFileSync(HUMAN_DECKLIST_PATH, text);
   return HUMAN_DECKLIST_PATH;
 }
@@ -159,17 +166,20 @@ async function fetchShimJson(shimPath: string): Promise<unknown> {
 // Forge's own CardPool.fromCardList format, "<count> <card name>" per
 // non-empty line — matches what api.ts's toDecklistText already sends, and
 // what DeckSerializer used to parse before saved decks moved to Postgres.
+// A trailing " {CMDR}"/" {SB}" marker (also written by toDecklistText)
+// records a card's commander/side-deck assignment.
 function parseDecklistText(body: string): StoredDeckCard[] {
   const cards: StoredDeckCard[] = [];
   for (const rawLine of body.split('\n')) {
     const line = rawLine.trim();
     if (!line) continue;
-    const match = /^(\d+)\s+(.+)$/.exec(line);
+    const match = /^(\d+)\s+(.+?)(?:\s+\{(CMDR|SB)\})?$/.exec(line);
     if (!match) continue;
     const count = Number(match[1]);
     const name = match[2].trim();
     if (!name || count <= 0) continue;
-    cards.push({ name, count });
+    const section = match[3] === 'CMDR' ? 'commander' : match[3] === 'SB' ? 'sideboard' : undefined;
+    cards.push(section ? { name, count, section } : { name, count });
   }
   return cards;
 }

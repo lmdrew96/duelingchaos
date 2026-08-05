@@ -166,6 +166,36 @@
   line-height: 1.2;
 }
 
+.deck-section-header {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 10px 0 4px;
+}
+
+.deck-section-header:first-child {
+  margin-top: 0;
+}
+
+.assign-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.assign-controls button {
+  clip-path: none;
+  border-radius: 999px;
+  padding: 2px 8px;
+  line-height: 1.2;
+  font-size: 0.7rem;
+}
+
+.assign-btn.active {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
 .count-value {
   font-family: var(--mono);
   min-width: 1.5em;

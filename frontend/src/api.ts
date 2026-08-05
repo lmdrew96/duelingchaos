@@ -12,8 +12,18 @@ import type {
 
 const BASE = '/api';
 
+// Plain "N Name" per line, same as ever, plus a trailing " {CMDR}"/" {SB}"
+// marker for a card assigned to the commander/side-deck section — parsed
+// back out by src/index.ts's parseDecklistText (persisted round-trip) and by
+// DeckboxHandlers.handleLegalityCheck (split into real Forge DeckSections so
+// Commander-format conformance checks actually see a commander).
 function toDecklistText(cards: DeckCard[]): string {
-  return cards.map((c) => `${c.count} ${c.name}`).join('\n');
+  return cards
+    .map((c) => {
+      const marker = c.section === 'commander' ? ' {CMDR}' : c.section === 'sideboard' ? ' {SB}' : '';
+      return `${c.count} ${c.name}${marker}`;
+    })
+    .join('\n');
 }
 
 export async function searchCards(query: string, limit = 300): Promise<CardSearchResult> {
