@@ -22,6 +22,21 @@ export function parseManaCostTokens(cost: string): string[] {
   return matches.map((m) => m.slice(1, -1));
 }
 
+// Converted mana cost / mana value: generic numbers add their value, X adds
+// nothing, colored/hybrid/Phyrexian pips add 1 each — except a hybrid pip
+// with a numeric half (e.g. "2/W"), which adds that number instead.
+export function manaValue(cost: string): number {
+  return parseManaCostTokens(cost).reduce((total, token) => {
+    if (/^\d+$/.test(token)) return total + Number(token);
+    if (token.toUpperCase() === 'X') return total;
+    if (token.includes('/')) {
+      const numeric = token.split('/').find((part) => /^\d+$/.test(part));
+      return total + (numeric ? Number(numeric) : 1);
+    }
+    return total + 1;
+  }, 0);
+}
+
 export function ManaPips({ cost, size = 'sm' }: { cost: string; size?: 'sm' | 'md' }) {
   const tokens = parseManaCostTokens(cost);
   // No {} tokens (land with no cost, or an unrecognized format) — degrade

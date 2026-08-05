@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as api from './api';
 import type { CardInfo, DeckCard, DecksList, Legality } from './types';
-import { ManaPips } from './manaCost';
+import { ManaPips, manaValue } from './manaCost';
 import { CardArt } from './CardArt';
 import { DecoCorners } from './DecoCorner';
+import { DeckStats } from './DeckStats';
 import './Deckbuilder.css';
+
+const CURVE_BUCKETS = 8; // 0,1,2,3,4,5,6,7+
 
 export default function Deckbuilder() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -12,6 +15,12 @@ export default function Deckbuilder() {
 
   const [deckName, setDeckName] = useState('');
   const [deckCards, setDeckCards] = useState<DeckCard[]>([]);
+  // Full CardInfo per deck card, keyed by name — DeckCard only carries
+  // {name, count}, so mana curve/color stats need this backfilled. Cards
+  // added from a search result are cached immediately (addCard receives
+  // the CardInfo it was clicked from); cards from a loaded deck (names
+  // only) are backfilled by the resolve effect below.
+  const [cardInfoCache, setCardInfoCache] = useState<Record<string, CardInfo>>({});
 
   const [formats, setFormats] = useState<string[]>([]);
   const [format, setFormat] = useState('Standard');
@@ -60,9 +69,57 @@ export default function Deckbuilder() {
     return () => clearTimeout(handle);
   }, [deckCards, format]);
 
+  // Backfills cardInfoCache for deck cards that arrived without it (loaded
+  // decks only carry names/counts) — mirrors the legality-check debounce
+  // below so rapid deck edits don't fire a resolve per keystroke/click.
+  useEffect(() => {
+    const missing = Array.from(new Set(deckCards.map((c) => c.name))).filter((n) => !cardInfoCache[n]);
+    if (missing.length === 0) return;
+    const handle = setTimeout(() => {
+      Promise.all(missing.map((n) => api.getCardDetail(n))).then((results) => {
+        setCardInfoCache((prev) => {
+          const next = { ...prev };
+          results.forEach((info, i) => {
+            if (info) next[missing[i]] = info;
+          });
+          return next;
+        });
+      });
+    }, 250);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deckCards, cardInfoCache]);
+
   const deckSize = deckCards.reduce((sum, c) => sum + c.count, 0);
 
-  const addCard = (name: string) => {
+  const manaCurve = useMemo(() => {
+    const buckets = new Array(CURVE_BUCKETS).fill(0);
+    for (const dc of deckCards) {
+      const info = cardInfoCache[dc.name];
+      if (!info || info.type.includes('Land')) continue;
+      buckets[Math.min(manaValue(info.manaCost), CURVE_BUCKETS - 1)] += dc.count;
+    }
+    return buckets;
+  }, [deckCards, cardInfoCache]);
+
+  const colorCounts = useMemo(() => {
+    const counts: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
+    for (const dc of deckCards) {
+      const info = cardInfoCache[dc.name];
+      if (!info || info.type.includes('Land')) continue;
+      if (!info.colors) {
+        counts.C += dc.count;
+        continue;
+      }
+      for (const ch of info.colors) {
+        if (ch in counts) counts[ch] += dc.count;
+      }
+    }
+    return counts;
+  }, [deckCards, cardInfoCache]);
+
+  const addCard = (name: string, info?: CardInfo) => {
+    if (info) setCardInfoCache((prev) => ({ ...prev, [name]: info }));
     setDeckCards((prev) => {
       const existing = prev.find((c) => c.name === name);
       if (existing) {
@@ -138,7 +195,7 @@ export default function Deckbuilder() {
           />
           <div className="card-list">
             {searchResults.map((card) => (
-              <div className="card-row" key={card.name} onClick={() => addCard(card.name)}>
+              <div className="card-row" key={card.name} onClick={() => addCard(card.name, card)}>
                 <CardArt name={card.name} variant="crop" className="card-row-art" />
                 <div className="card-row-main">
                   <div className="card-name">{card.name}</div>
@@ -182,6 +239,8 @@ export default function Deckbuilder() {
               <p className="empty-hint">Search for cards or load a deck to get started.</p>
             )}
           </div>
+
+          {deckCards.length > 0 && <DeckStats manaCurve={manaCurve} colorCounts={colorCounts} />}
         </section>
 
         <section className="panel">
