@@ -115,6 +115,7 @@ public class BridgeMain {
         server.createContext("/action/select-entity", BridgeMain::handleSelectEntity);
         server.createContext("/action/concede", BridgeMain::handleConcede);
         server.createContext("/action/undo", BridgeMain::handleUndo);
+        server.createContext("/action/cheat", BridgeMain::handleCheat);
         DeckboxHandlers.register(server, decksDir);
         server.setExecutor(null);
         server.start();
@@ -185,6 +186,70 @@ public class BridgeMain {
         }
         boolean ok = humanController != null && humanController.tryUndoLastAction();
         respond(exchange, 200, "{\"ok\":" + ok + "}");
+    }
+
+    private static final Pattern CHEAT_FIELD = Pattern.compile("\"cheat\"\\s*:\\s*\"(\\w+)\"");
+
+    // Dev-only test/demo tooling (hidden behind the frontend's DEV check) —
+    // exposes the useful subset of Forge's IDevModeCheats surface
+    // (PlayerControllerHuman.cheat()) that BridgeGuiGame's fixed
+    // getChoices/getInteger plumbing can now actually drive: setPlayerLife,
+    // addCardToHand, addCardToBattlefield, winGame.
+    //
+    // Each of those methods makes its OWN blocking IGuiGame calls internally
+    // (a player picker, then a life value or card name, etc.) — the same
+    // blocking rendezvous forge-game-thread already uses for real decisions
+    // (see BridgeGuiGame.getChoices/showInputDialog). Running the cheat
+    // directly on this HTTP handler thread would deadlock the single
+    // threaded server (setExecutor(null)) against itself: the prompt it
+    // produces could only ever be answered by another HTTP request, which
+    // can't be processed while this thread is stuck waiting on it. A
+    // one-shot background thread keeps that blocking off the HTTP thread —
+    // the resulting pendingChoice/pendingPrompt just shows up on the next
+    // /state poll and resolves through the existing action endpoints exactly
+    // like any other in-game decision.
+    private static void handleCheat(HttpExchange exchange) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            respond(exchange, 405, "{\"error\":\"POST only\"}");
+            return;
+        }
+        if (humanController == null) {
+            respond(exchange, 409, "{\"error\":\"no active game\"}");
+            return;
+        }
+        String body;
+        try (InputStream is = exchange.getRequestBody()) {
+            body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        Matcher m = CHEAT_FIELD.matcher(body);
+        if (!m.find()) {
+            respond(exchange, 400, "{\"error\":\"expected JSON body {\\\"cheat\\\": \\\"name\\\"}\"}");
+            return;
+        }
+        Runnable action = cheatActionFor(m.group(1));
+        if (action == null) {
+            respond(exchange, 400, "{\"error\":\"unknown cheat: " + m.group(1) + "\"}");
+            return;
+        }
+        new Thread(() -> {
+            try {
+                action.run();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }, "cheat-thread").start();
+        respond(exchange, 200, "{\"ok\":true}");
+    }
+
+    private static Runnable cheatActionFor(String name) {
+        forge.interfaces.IDevModeCheats cheats = humanController.cheat();
+        switch (name) {
+            case "setPlayerLife": return cheats::setPlayerLife;
+            case "addCardToHand": return cheats::addCardToHand;
+            case "addCardToBattlefield": return cheats::addCardToBattlefield;
+            case "winGame": return cheats::winGame;
+            default: return null;
+        }
     }
 
     private static void handlePassPriority(HttpExchange exchange) throws IOException {

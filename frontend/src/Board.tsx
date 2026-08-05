@@ -381,12 +381,17 @@ function ChoicePanel({
   const options = choice.options ?? [];
   const [numberValue, setNumberValue] = useState(choice.initialInput ?? '0');
   const [amounts, setAmounts] = useState<number[]>(() => options.map(() => 0));
+  const [filter, setFilter] = useState('');
 
   useEffect(() => {
     setNumberValue(choice.initialInput ?? '0');
     setAmounts(options.map(() => 0));
+    setFilter('');
+    // options.length, not options.join('|') — the dev cheat panel's card
+    // picker can be tens of thousands of entries, too large to rebuild a
+    // joined string from on every dependency check.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [choice.kind, choice.title, options.join('|')]);
+  }, [choice.kind, choice.title, options.length]);
 
   if (choice.kind === 'number') {
     const value = Number(numberValue);
@@ -451,6 +456,18 @@ function ChoicePanel({
   const max = choice.kind === 'target' ? 1 : choice.max || options.length;
   const valid = selected.length >= choice.min && selected.length <= max;
   const allPips = choice.kind === 'list' && options.length > 0 && options.every((o) => manaPipClass(o));
+  // Card-name-scale lists (the dev cheat panel's "add to hand/battlefield"
+  // card picker is every card face in the database) are unusable as a flat
+  // button grid — a client-side filter turns it into a browse-by-typing
+  // list instead of a wall of thousands of buttons.
+  const showFilter = !allPips && !boardIsPicker && options.length > 20;
+  const matchedIndices = showFilter
+    ? options.reduce<number[]>((acc, label, i) => {
+        if (label.toLowerCase().includes(filter.toLowerCase())) acc.push(i);
+        return acc;
+      }, [])
+    : options.map((_, i) => i);
+  const visibleIndices = showFilter ? matchedIndices.slice(0, 200) : matchedIndices;
 
   return (
     <div className="choice-panel">
@@ -460,25 +477,43 @@ function ChoicePanel({
       {boardIsPicker ? (
         <p className="choice-hint">Click a highlighted target on the board.</p>
       ) : (
-        <div className={allPips ? 'choice-pips' : 'choice-options'}>
-          {options.map((label, i) => {
-            const pipClass = allPips ? manaPipClass(label) : null;
-            return (
-              <button
-                key={i}
-                className={
-                  pipClass
-                    ? `choice-pip ${pipClass}${selected.includes(i) ? ' selected' : ''}`
-                    : `choice-option${selected.includes(i) ? ' selected' : ''}`
-                }
-                title={label}
-                onClick={() => onToggle(i)}
-              >
-                {pipClass ? '' : label}
-              </button>
-            );
-          })}
-        </div>
+        <>
+          {showFilter && (
+            <input
+              className="choice-filter"
+              type="text"
+              placeholder="Filter…"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              autoFocus
+            />
+          )}
+          <div className={allPips ? 'choice-pips' : 'choice-options'}>
+            {visibleIndices.map((i) => {
+              const label = options[i];
+              const pipClass = allPips ? manaPipClass(label) : null;
+              return (
+                <button
+                  key={i}
+                  className={
+                    pipClass
+                      ? `choice-pip ${pipClass}${selected.includes(i) ? ' selected' : ''}`
+                      : `choice-option${selected.includes(i) ? ' selected' : ''}`
+                  }
+                  title={label}
+                  onClick={() => onToggle(i)}
+                >
+                  {pipClass ? '' : label}
+                </button>
+              );
+            })}
+          </div>
+          {showFilter && matchedIndices.length > visibleIndices.length && (
+            <p className="choice-hint">
+              Showing first {visibleIndices.length} matches — refine your search to see more.
+            </p>
+          )}
+        </>
       )}
       <div className="choice-footer">
         <button disabled={!valid} onClick={() => onResolve(selected)}>
@@ -648,6 +683,40 @@ function GameLogPanel({ entries, onClose }: { entries: GameLogEntry[]; onClose: 
   );
 }
 
+const CHEATS: { name: string; label: string }[] = [
+  { name: 'setPlayerLife', label: 'Set life' },
+  { name: 'addCardToHand', label: 'Add card to hand' },
+  { name: 'addCardToBattlefield', label: 'Add card to battlefield' },
+  { name: 'winGame', label: 'Win game' },
+];
+
+// Dev-only test/demo tooling for setting up board states without playing a
+// full real game — exposes the useful subset of Forge's IDevModeCheats
+// (PlayerControllerHuman.cheat()) that BridgeGuiGame's getChoices/
+// getInteger plumbing can now actually drive end-to-end. Docked like
+// GameLogPanel rather than a blocking modal: triggering a cheat produces a
+// normal pendingChoice/pendingPrompt (pick a player, a life total, a card)
+// that resolves through the board's existing choice UI, same as any other
+// in-game decision.
+function CheatPanel({ onClose, onCheat }: { onClose: () => void; onCheat: (name: string) => void }) {
+  return (
+    <div className="cheat-panel">
+      <DecoCorners />
+      <button type="button" className="ghost card-detail-close" onClick={onClose}>
+        close
+      </button>
+      <p className="choice-title">Dev cheats</p>
+      <div className="cheat-buttons">
+        {CHEATS.map((c) => (
+          <button key={c.name} className="ghost" onClick={() => onCheat(c.name)}>
+            {c.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Non-blocking, dismissible nudges for legal-but-easy-to-forget options
 // (land drop, an unused instant) — never a rules warning, since Forge
 // enforces those itself. Dismissal is per-instance, not persisted: once the
@@ -729,6 +798,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
   const [stackDetailItem, setStackDetailItem] = useState<StackItem | null>(null);
   const [dismissedPointerIds, setDismissedPointerIds] = useState<Set<string>>(new Set());
   const [logOpen, setLogOpen] = useState(false);
+  const [cheatOpen, setCheatOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   // Maps "card:<id>" / "player:<id>" to its rendered element — populated by
   // ref callbacks on CardTile/life-badge/stack-tile as they mount, read back
@@ -941,6 +1011,11 @@ export default function Board({ onExit }: { onExit: () => void }) {
         <button className={`ghost${logOpen ? ' active' : ''}`} onClick={() => setLogOpen((o) => !o)}>
           log
         </button>
+        {import.meta.env.DEV && (
+          <button className={`ghost${cheatOpen ? ' active' : ''}`} onClick={() => setCheatOpen((o) => !o)}>
+            cheats
+          </button>
+        )}
         <button className="ghost" disabled={!state.canUndo} onClick={() => runAction(api.undo)}>
           undo
         </button>
@@ -1105,6 +1180,10 @@ export default function Board({ onExit }: { onExit: () => void }) {
       )}
 
       {logOpen && <GameLogPanel entries={state.log} onClose={() => setLogOpen(false)} />}
+
+      {cheatOpen && (
+        <CheatPanel onClose={() => setCheatOpen(false)} onCheat={(name) => runAction(() => api.cheat(name))} />
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import forge.deck.CardPool;
 import forge.game.GameEntityView;
 import forge.game.GameState;
 import forge.game.GameView;
+import forge.game.card.CardFaceView;
 import forge.game.card.CardView;
 import forge.game.phase.PhaseType;
 import forge.game.player.DelayedReveal;
@@ -294,6 +295,27 @@ public class BridgeGuiGame extends AbstractGuiGame {
         // exact pair is the only reliable signal available without deeper
         // Input-class plumbing.
         isMulliganPrompt = "Keep".equals(label1) && "Mulligan".equals(label2);
+    }
+
+    // IGuiGame's own default for this 4-arg overload (verified via bytecode)
+    // cascades into the 6-arg getChoices below with display=null — which
+    // that method's null-display branch treats as "no way to label the
+    // options," silently returning zero picks rather than prompting. That
+    // default is why oneOrNone() (used by, among others, every
+    // IDevModeCheats method: setPlayerLife's player picker, addCardToHand's
+    // card-name picker) always no-ops today. Supplying a real display
+    // function here instead — GameEntityView via the existing entityLabel()
+    // helper, CardFaceView (the "Name the card" cheat picker) via getName(),
+    // anything else via toString() — makes those prompts actually render.
+    @Override
+    public <T> List<T> getChoices(String message, int min, int max, List<T> choices) {
+        return getChoices(message, min, max, choices, null, BridgeGuiGame::describeChoice);
+    }
+
+    private static <T> String describeChoice(T item) {
+        if (item instanceof GameEntityView) return entityLabel((GameEntityView) item);
+        if (item instanceof CardFaceView) return ((CardFaceView) item).getName();
+        return String.valueOf(item);
     }
 
     // Generic list-choice hook. Forge reuses this for several distinct
