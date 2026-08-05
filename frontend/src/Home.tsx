@@ -3,6 +3,7 @@ import { useAuth, SignInButton } from '@clerk/react';
 import * as api from './api';
 import type { DecksList, MatchStats } from './types';
 import { DecoCorners } from './DecoCorner';
+import { DecoCrown } from './DecoCrown';
 import { DecoRule } from './DecoRule';
 import './Deckbuilder.css';
 import './Home.css';
@@ -27,16 +28,18 @@ function HomeWithAuth({ onNavigate }: { onNavigate: (view: View) => void }) {
 function Landing({ onNavigate }: { onNavigate: (view: View) => void }) {
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header-row">
-          <h1>DuelingChaos</h1>
-        </div>
-        <span className="subtitle">Player vs. CPU Magic: The Gathering, powered by Forge's own rules engine.</span>
-      </header>
+      <div className="landing-hero">
+        <span className="landing-eyebrow">Player vs. CPU · Powered by Forge</span>
+        <h1 className="landing-title">DuelingChaos</h1>
+        <p className="subtitle">
+          A full rules-accurate game of Magic: The Gathering against the computer — no opponent required.
+        </p>
+      </div>
       <DecoRule />
 
-      <section className="panel" style={{ marginTop: 20, maxWidth: 640 }}>
+      <section className="panel landing-cta">
         <DecoCorners />
+        <DecoCrown />
         <h2>Build a deck, then play it against the AI</h2>
         <p>
           Search the full card pool, assemble a deck, check it against real format legality, and take it to the
@@ -57,6 +60,30 @@ function Landing({ onNavigate }: { onNavigate: (view: View) => void }) {
           </p>
         )}
       </section>
+
+      <div className="landing-features">
+        <section className="panel">
+          <DecoCorners />
+          <h2>Real rules, not a simulation</h2>
+          <p>
+            Forge's own engine runs the game — full targeting, combat math, triggered abilities, and mana payment,
+            not a simplified stand-in.
+          </p>
+        </section>
+        <section className="panel">
+          <DecoCorners />
+          <h2>Build &amp; check legality</h2>
+          <p>
+            Search the entire card pool, assemble a deck, and see it checked against a real format's structural and
+            banlist rules as you build.
+          </p>
+        </section>
+        <section className="panel">
+          <DecoCorners />
+          <h2>Track your record</h2>
+          <p>Sign in to save decks across sessions and keep a running win/loss history for each one.</p>
+        </section>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,69 @@
+.landing-hero {
+  max-width: 640px;
+  margin: 40px auto 0;
+  text-align: center;
+}
+
+.landing-eyebrow {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.landing-title {
+  font-size: 3rem;
+}
+
+.landing-hero .subtitle {
+  display: block;
+  margin: 12px auto 0;
+  max-width: 480px;
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+.landing-cta {
+  margin: 32px auto 0;
+  max-width: 640px;
+  text-align: center;
+}
+
+.landing-cta p {
+  color: var(--text-muted);
+}
+
 .landing-actions {
   display: flex;
   gap: 12px;
   margin-top: 16px;
+  justify-content: center;
+}
+
+.landing-features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin: 24px auto 0;
+  max-width: 960px;
+}
+
+.landing-features p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 800px) {
+  .landing-features {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-title {
+    font-size: 2.25rem;
+  }
 }
 
 .landing-signin-hint {
