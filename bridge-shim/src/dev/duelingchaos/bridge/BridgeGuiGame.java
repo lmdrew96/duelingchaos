@@ -216,10 +216,51 @@ public class BridgeGuiGame extends AbstractGuiGame {
         System.out.println("[gui] " + title + ": " + message);
     }
 
+    // Scry/surveil's multi-card path is the main thing this drives (verified
+    // via bytecode inspection of PlayerControllerHuman.arrangeForScry/
+    // arrangeForSurveil — no source jar matched the shipped 2.0.13-SNAPSHOT
+    // build, see forge-integration-technique): both call the 5-arg
+    // IGuiGame.many(title, top, -1, choices, referenceCard) to pick the
+    // bottom/graveyard pile, which cascades through two default-method
+    // overloads down to this same abstract order() with min=max=-1 and
+    // destChoices=null; separately, the 4-arg order() (used to arrange the
+    // kept-on-top cards) cascades here with min=max=0. Forge uses that sign
+    // as the only signal distinguishing the two shapes: -1 means "choose an
+    // optional subset" (many/scry-bottom/surveil-graveyard — the caller
+    // takes the ENTIRE returned list as the moved pile, so 0 picks is a
+    // legal choice), 0 means "must place every card" (a forced full
+    // permutation for the reorder-only case). Single-card scry/surveil
+    // never reaches here — Forge special-cases size==1 via
+    // InputConfirm.confirm, which already routes through the
+    // updateButtons/showPromptMessage plumbing above (same mechanism as the
+    // already-working mulligan Keep/Mulligan prompt).
     @Override
     public <T> IGuiGame.OrderResult<T> order(String title, String top, int min, int max,
             List<T> sourceChoices, List<T> destChoices, CardView referenceCard, boolean sideboardingMode, boolean isFreeform) {
-        return new IGuiGame.OrderResult<>(sourceChoices, false);
+        if (sourceChoices.size() <= 1) {
+            return new IGuiGame.OrderResult<>(new ArrayList<>(sourceChoices), false);
+        }
+        List<String> labels = new ArrayList<>();
+        for (T c : sourceChoices) {
+            labels.add(c instanceof CardView ? entityLabel((CardView) c) : String.valueOf(c));
+        }
+        boolean optionalSubset = min < 0;
+        int selMin = optionalSubset ? 0 : sourceChoices.size();
+        int selMax = sourceChoices.size();
+        pendingChoice = PendingChoice.list(title, labels, selMin, selMax);
+        String answer = awaitChoiceAnswer();
+        pendingChoice = null;
+        List<T> result = new ArrayList<>();
+        for (int idx : parseIndices(answer)) {
+            if (idx >= 0 && idx < sourceChoices.size()) result.add(sourceChoices.get(idx));
+        }
+        if (result.size() < selMin) {
+            // malformed/short answer — fall back to the old deterministic
+            // default rather than hand Forge a choice that violates its own
+            // min-count contract
+            return new IGuiGame.OrderResult<>(new ArrayList<>(sourceChoices), false);
+        }
+        return new IGuiGame.OrderResult<>(result, false);
     }
 
     @Override
@@ -488,12 +529,74 @@ public class BridgeGuiGame extends AbstractGuiGame {
         return defaultOption;
     }
 
+    // The real scry/surveil entry point on this build (live-tested: Forge's
+    // UI_SELECT_FROM_CARD_DISPLAYS preference defaults true on desktop, and
+    // isLibgdxPort() is false here, so PlayerControllerHuman.arrangeForScry
+    // takes the arrangeForMove()->manipulateCardList() branch rather than
+    // the many()/order() branch order() above handles — confirmed by live
+    // testing: the order() fix alone left scry silently sending everything
+    // to the bottom, no exception, no prompt, because this method was never
+    // being called into by that path). arrangeForMove's own post-processing
+    // (decompiled from PlayerControllerHuman.class) reconstructs the
+    // (top, bottom) pair by scanning the returned list for a contiguous
+    // run of "manipulable" cards at the very front (-> bottom pile, in that
+    // order) and another at the very back (-> top pile) — so the contract
+    // here is: return `cards` rearranged as [chosen-for-bottom...,
+    // untouched-non-manipulable-cards-in-original-order...,
+    // chosen-for-top...]. Two sequential PendingChoice prompts (bottom
+    // subset+order, then top-remainder order) mirror how Forge's own
+    // desktop GUI presents scry/surveil as two steps. NOTE: the exact
+    // top-pile sub-ordering direction (which end of topChosen lands as the
+    // literal top card after arrangeForMove's reverse + GameAction.scry's
+    // second reverse) is reasoned from bytecode, not independently
+    // live-verified for 3+ card top piles — flag for a closer look if a
+    // Scry/Surveil 3+ ever reorders the kept cards backwards in practice.
     @Override
     public List<CardView> manipulateCardList(String title, Iterable<CardView> cards, Iterable<CardView> manipulable, boolean toTop, boolean toBottom, boolean toAnywhere) {
-        List<CardView> result = new ArrayList<>();
-        for (CardView c : cards) {
-            result.add(c);
+        List<CardView> all = new ArrayList<>();
+        for (CardView c : cards) all.add(c);
+        List<CardView> moveable = new ArrayList<>();
+        for (CardView c : manipulable) moveable.add(c);
+        if (moveable.isEmpty()) {
+            return all;
         }
+
+        List<CardView> remaining = new ArrayList<>(moveable);
+        List<CardView> bottomChosen = new ArrayList<>();
+        if (toBottom && !remaining.isEmpty()) {
+            List<String> labels = new ArrayList<>();
+            for (CardView c : remaining) labels.add(entityLabel(c));
+            pendingChoice = PendingChoice.list(title + " — choose cards for the bottom of your library", labels, 0, remaining.size());
+            String answer = awaitChoiceAnswer();
+            pendingChoice = null;
+            for (int idx : parseIndices(answer)) {
+                if (idx >= 0 && idx < remaining.size()) bottomChosen.add(remaining.get(idx));
+            }
+            remaining.removeAll(bottomChosen);
+        }
+
+        List<CardView> topChosen = new ArrayList<>(remaining);
+        if (toTop && remaining.size() > 1) {
+            List<String> labels = new ArrayList<>();
+            for (CardView c : remaining) labels.add(entityLabel(c));
+            pendingChoice = PendingChoice.list(title + " — arrange cards for the top of your library", labels, remaining.size(), remaining.size());
+            String answer = awaitChoiceAnswer();
+            pendingChoice = null;
+            List<CardView> ordered = new ArrayList<>();
+            for (int idx : parseIndices(answer)) {
+                if (idx >= 0 && idx < remaining.size()) ordered.add(remaining.get(idx));
+            }
+            if (ordered.size() == remaining.size()) {
+                topChosen = ordered;
+            }
+        }
+
+        List<CardView> result = new ArrayList<>();
+        result.addAll(bottomChosen);
+        for (CardView c : all) {
+            if (!moveable.contains(c)) result.add(c);
+        }
+        result.addAll(topChosen);
         return result;
     }
 
