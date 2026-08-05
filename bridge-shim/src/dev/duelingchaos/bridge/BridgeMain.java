@@ -210,7 +210,8 @@ public class BridgeMain {
     }
 
     // Resolves a pending BridgeGuiGame.PendingChoice of kind "combatDamage"
-    // — per-blocker damage split, in the same order as pendingChoice.options.
+    // or "splitAmount" — both are "split a total across pendingChoice.options,
+    // in order" and resolveChoice() doesn't care which produced the answer.
     private static void handleAssignDamage(HttpExchange exchange) throws IOException {
         if (!"POST".equals(exchange.getRequestMethod())) {
             respond(exchange, 405, "{\"error\":\"POST only\"}");

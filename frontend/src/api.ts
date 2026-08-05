@@ -106,6 +106,8 @@ export const tapLand = (index: number): Promise<void> => postAction('tap-land', 
 export const selectChoice = (indices: number[]): Promise<void> =>
   postAction('select-choice', { indices });
 export const selectNumber = (value: number): Promise<void> => postAction('select-number', { value });
+// Resolves a pendingChoice of kind "combatDamage" or "splitAmount" — both
+// split a total across pendingChoice.options, in order.
 export const assignDamage = (amounts: number[]): Promise<void> =>
   postAction('assign-damage', { amounts });
 

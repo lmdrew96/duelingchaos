@@ -34,13 +34,14 @@ import java.util.concurrent.TimeUnit;
 // AbstractGuiGame (the same base Forge's own desktop/mobile GUIs extend)
 // already implements most of IGuiGame's plumbing — state tracking, zone
 // updates, etc. What's left below is the actual "ask a human something"
-// surface: dialogs, choices, targeting. Since nothing drives this over HTTP
-// yet, every one of these takes the simplest deterministic default (first
-// option, minimum required, no-op) rather than blocking forever waiting for
-// a UI that doesn't exist. Good enough to prove land/spell/pass-priority;
-// anything needing a *real* choice (targeting, modes, X-cost, mana payment
-// choices) will surface as a wrong-but-not-hung default during testing —
-// each is a candidate for a real HTTP prompt endpoint once we hit it.
+// surface: dialogs, choices, targeting. Every real decision (targeting,
+// modes, X-cost, mana payment, combat damage, confirm/option dialogs,
+// generic amount-splitting) now routes through the PendingChoice +
+// SynchronousQueue rendezvous below instead of a hardcoded default —
+// the callback blocks the forge-game-thread, exposes the choice via
+// getPendingChoice(), and a generic HTTP endpoint resolves it. The only
+// deliberate holdout is showInputDialog's non-numeric branch (free-text
+// input isn't a shape any card in scope needs yet).
 public class BridgeGuiGame extends AbstractGuiGame {
 
     // Surfaces what Forge is waiting on for the human seat so the frontend
@@ -78,7 +79,10 @@ public class BridgeGuiGame extends AbstractGuiGame {
         public final boolean isNumeric;
         public final String initialInput;
         public final String attacker;
-        public final int damage;
+        // Shared by "combatDamage" (total combat damage) and "splitAmount"
+        // (any other Forge-driven "split N across these targets" prompt,
+        // e.g. assignGenericAmount) — same split-a-total-across-inputs UI.
+        public final int amount;
         // "card:<id>" / "player:<id>" refs parallel to options — lets the
         // frontend match a target choice to the actual rendered card/player
         // tile (by stable Forge id) instead of a display-string guess, so it
@@ -92,7 +96,7 @@ public class BridgeGuiGame extends AbstractGuiGame {
         public final String sourceRef;
 
         private PendingChoice(String kind, String title, List<String> options, int min, int max,
-                boolean optional, boolean isNumeric, String initialInput, String attacker, int damage,
+                boolean optional, boolean isNumeric, String initialInput, String attacker, int amount,
                 List<String> refs, String sourceRef) {
             this.kind = kind;
             this.title = title;
@@ -103,7 +107,7 @@ public class BridgeGuiGame extends AbstractGuiGame {
             this.isNumeric = isNumeric;
             this.initialInput = initialInput;
             this.attacker = attacker;
-            this.damage = damage;
+            this.amount = amount;
             this.refs = refs;
             this.sourceRef = sourceRef;
         }
@@ -126,6 +130,14 @@ public class BridgeGuiGame extends AbstractGuiGame {
 
         static PendingChoice combatDamage(String attacker, List<String> blockerLabels, int damage) {
             return new PendingChoice("combatDamage", "Assign combat damage", blockerLabels, 0, 0, false, false, null, attacker, damage, null, null);
+        }
+
+        // atLeastOne mirrors Forge's own constraint (e.g. Fling-style effects
+        // that must put at least 1 on every chosen target) — reuses
+        // `optional` the same way `number`'s min does: true means a target
+        // may legally end up at 0.
+        static PendingChoice splitAmount(String title, List<String> targetLabels, int amount, boolean atLeastOne) {
+            return new PendingChoice("splitAmount", title, targetLabels, atLeastOne ? 1 : 0, 0, !atLeastOne, false, null, null, amount, null, null);
         }
     }
 
@@ -307,7 +319,18 @@ public class BridgeGuiGame extends AbstractGuiGame {
 
     @Override
     public boolean confirm(CardView c, String question, boolean defaultIsYes, List<String> options) {
-        return defaultIsYes;
+        // `options` here is Forge's own extra reminder-text lines shown
+        // alongside the question (not alternate buttons) — folded into the
+        // title so the human sees them, while the actual decision stays a
+        // real yes/no pick either way.
+        String title = (options == null || options.isEmpty())
+            ? question
+            : question + "\n" + String.join("\n", options);
+        pendingChoice = PendingChoice.list(title, java.util.Arrays.asList("Yes", "No"), 1, 1);
+        String answer = awaitChoiceAnswer();
+        pendingChoice = null;
+        List<Integer> indices = parseIndices(answer);
+        return indices.isEmpty() ? defaultIsYes : indices.get(0) == 0;
     }
 
     @Override
@@ -433,7 +456,13 @@ public class BridgeGuiGame extends AbstractGuiGame {
 
     @Override
     public boolean showConfirmDialog(String message, String title, String yesButtonText, String noButtonText, boolean defaultIsYes) {
-        return defaultIsYes;
+        String yes = (yesButtonText == null || yesButtonText.isEmpty()) ? "Yes" : yesButtonText;
+        String no = (noButtonText == null || noButtonText.isEmpty()) ? "No" : noButtonText;
+        pendingChoice = PendingChoice.list(message, java.util.Arrays.asList(yes, no), 1, 1);
+        String answer = awaitChoiceAnswer();
+        pendingChoice = null;
+        List<Integer> indices = parseIndices(answer);
+        return indices.isEmpty() ? defaultIsYes : indices.get(0) == 0;
     }
 
     @Override
@@ -535,16 +564,56 @@ public class BridgeGuiGame extends AbstractGuiGame {
     @Override
     public Map<Object, Integer> assignGenericAmount(CardView sa, Map<Object, Integer> targets, int amount, boolean atLeastOne, String amountLabel) {
         Map<Object, Integer> result = new java.util.HashMap<>();
-        for (Object key : targets.keySet()) {
-            result.put(key, amount);
-            break;
+        List<Object> keys = new ArrayList<>(targets.keySet());
+        if (keys.isEmpty()) {
+            return result;
+        }
+        if (keys.size() == 1) {
+            // no real choice to make — the one target takes it all
+            result.put(keys.get(0), amount);
+            return result;
+        }
+        List<String> labels = new ArrayList<>();
+        for (Object key : keys) {
+            labels.add(key instanceof GameEntityView ? entityLabel((GameEntityView) key) : String.valueOf(key));
+        }
+        String label = (amountLabel == null || amountLabel.isEmpty()) ? "amount" : amountLabel;
+        pendingChoice = PendingChoice.splitAmount("Distribute " + amount + " " + label, labels, amount, atLeastOne);
+        String answer = awaitChoiceAnswer();
+        pendingChoice = null;
+        List<Integer> amounts = parseIndices(answer);
+        int total = 0;
+        for (int a : amounts) total += a;
+        boolean everyTargetMet = true;
+        if (atLeastOne) {
+            for (int a : amounts) {
+                if (a < 1) { everyTargetMet = false; break; }
+            }
+        }
+        if (amounts.size() != keys.size() || total != amount || !everyTargetMet) {
+            // malformed/short answer — fall back to the old deterministic
+            // default rather than hand Forge a split that doesn't sum right
+            result.put(keys.get(0), amount);
+            return result;
+        }
+        for (int i = 0; i < keys.size(); i++) {
+            result.put(keys.get(i), amounts.get(i));
         }
         return result;
     }
 
     @Override
     public int showOptionDialog(String message, String title, FSkinProp icon, List<String> options, int defaultOption) {
-        return defaultOption;
+        if (options == null || options.size() <= 1) {
+            return defaultOption;
+        }
+        pendingChoice = PendingChoice.list(message, new ArrayList<>(options), 1, 1);
+        String answer = awaitChoiceAnswer();
+        pendingChoice = null;
+        List<Integer> indices = parseIndices(answer);
+        if (indices.isEmpty()) return defaultOption;
+        int idx = indices.get(0);
+        return (idx >= 0 && idx < options.size()) ? idx : defaultOption;
     }
 
     // The real scry/surveil entry point on this build (live-tested: Forge's

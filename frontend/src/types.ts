@@ -65,7 +65,7 @@ export type PendingPrompt = {
   button2Enabled: boolean;
 };
 
-export type PendingChoiceKind = 'list' | 'target' | 'targets' | 'number' | 'combatDamage';
+export type PendingChoiceKind = 'list' | 'target' | 'targets' | 'number' | 'combatDamage' | 'splitAmount';
 
 export type PendingChoice = {
   kind: PendingChoiceKind;
@@ -77,7 +77,9 @@ export type PendingChoice = {
   isNumeric: boolean;
   initialInput: string | null;
   attacker: string | null;
-  damage: number;
+  // Total to split across `options` for "combatDamage" (combat damage) and
+  // "splitAmount" (any other Forge assignGenericAmount-style split) alike.
+  amount: number;
   refs: (EntityRef | null)[] | null;
   sourceRef: EntityRef | null;
 };

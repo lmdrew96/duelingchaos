@@ -312,8 +312,8 @@ function PlayerZone({
 
 // One panel shape for every pendingChoice kind — they all reduce to
 // "pick indices from options" (list/target/targets), "pick a number"
-// (number), or "split a number across options" (combatDamage). Mirrors
-// the shared PendingChoice plumbing on the bridge side.
+// (number), or "split a number across options" (combatDamage/splitAmount).
+// Mirrors the shared PendingChoice plumbing on the bridge side.
 function ChoicePanel({
   choice,
   onResolve,
@@ -355,17 +355,21 @@ function ChoicePanel({
     );
   }
 
-  if (choice.kind === 'combatDamage') {
+  if (choice.kind === 'combatDamage' || choice.kind === 'splitAmount') {
     const total = amounts.reduce((a, b) => a + b, 0);
-    const valid = total === choice.damage;
+    // "splitAmount" without `optional` means Forge requires every target to
+    // end up with at least 1 (its atLeastOne flag) — combatDamage has no
+    // such constraint, a blocker can legally take 0.
+    const eachTargetMet = choice.kind === 'combatDamage' || choice.optional || amounts.every((a) => a >= 1);
+    const valid = total === choice.amount && eachTargetMet;
     const setAmount = (i: number, v: number) => setAmounts((prev) => prev.map((a, idx) => (idx === i ? v : a)));
+    const heading =
+      choice.kind === 'combatDamage' ? `${choice.attacker} assigns ${choice.amount} damage` : choice.title;
     return (
       <div className="choice-panel">
         <DecoCorners />
         <DecoCrown />
-        <p className="choice-title">
-          {choice.attacker} assigns {choice.damage} damage
-        </p>
+        <p className="choice-title">{heading}</p>
         <div className="choice-damage-rows">
           {options.map((label, i) => (
             <div className="choice-damage-row" key={i}>
@@ -373,7 +377,7 @@ function ChoicePanel({
               <input
                 type="number"
                 min={0}
-                max={choice.damage}
+                max={choice.amount}
                 value={amounts[i] ?? 0}
                 onChange={(e) => setAmount(i, Math.max(0, Number(e.target.value)))}
               />
@@ -382,7 +386,7 @@ function ChoicePanel({
         </div>
         <div className="choice-footer">
           <span className={`choice-total${valid ? ' valid' : ''}`}>
-            {total} / {choice.damage} assigned
+            {total} / {choice.amount} assigned
           </span>
           <button disabled={!valid} onClick={() => onResolve(amounts)}>
             Confirm
@@ -828,7 +832,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
     if (!choice) return;
     if (choice.kind === 'number') {
       runAction(() => api.selectNumber(values[0] ?? 0));
-    } else if (choice.kind === 'combatDamage') {
+    } else if (choice.kind === 'combatDamage' || choice.kind === 'splitAmount') {
       runAction(() => api.assignDamage(values));
     } else {
       runAction(() => api.selectChoice(values));

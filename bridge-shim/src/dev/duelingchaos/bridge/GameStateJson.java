@@ -100,7 +100,7 @@ public final class GameStateJson {
         field(sb, "isNumeric", c.isNumeric); sb.append(',');
         field(sb, "initialInput", c.initialInput); sb.append(',');
         field(sb, "attacker", c.attacker); sb.append(',');
-        field(sb, "damage", c.damage); sb.append(',');
+        field(sb, "amount", c.amount); sb.append(',');
         sb.append("\"refs\":");
         if (c.refs == null) {
             sb.append("null");
