@@ -198,10 +198,34 @@ public class BridgeGuiGame extends AbstractGuiGame {
         button2Enabled = enable2;
     }
 
+    // Generic list-choice hook. Forge reuses this for several distinct
+    // human decisions — modal spells ("choose one/two —"), and (confirmed
+    // via reflection: AbstractGuiGame has no dedicated mana-color/source
+    // hook) ambiguous mana payment too. Both resolve identically: pick
+    // indices from the displayed list.
     @Override
     public <T> List<T> getChoices(String message, int min, int max, List<T> choices, List<T> selected, FSerializableFunction<T, String> display) {
-        int count = Math.max(min, 0);
-        return new ArrayList<>(choices.subList(0, Math.min(count, choices.size())));
+        if (choices.isEmpty()) {
+            return new ArrayList<>();
+        }
+        if (choices.size() <= Math.max(min, 0)) {
+            // no real freedom — must take every option to satisfy min
+            return new ArrayList<>(choices);
+        }
+        List<String> labels = new ArrayList<>();
+        for (T c : choices) labels.add(display.apply(c));
+        pendingChoice = PendingChoice.list(message, labels, Math.max(min, 0), max <= 0 ? choices.size() : max);
+        String answer = awaitChoiceAnswer();
+        pendingChoice = null;
+        List<T> result = new ArrayList<>();
+        for (int idx : parseIndices(answer)) {
+            if (idx >= 0 && idx < choices.size()) result.add(choices.get(idx));
+        }
+        if (result.size() < Math.max(min, 0)) {
+            result.clear();
+            result.addAll(choices.subList(0, Math.min(Math.max(min, 0), choices.size())));
+        }
+        return result;
     }
 
     @Override
