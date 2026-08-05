@@ -1,5 +1,23 @@
+/* Fixed-height flex column, not a bare fragment — .app-content below fills
+   whatever's left under the nav exactly, so a view that needs to be
+   scroll-free within the viewport (the board) can size itself to 100% of
+   that instead of guessing the nav's pixel height (see .board-shell). */
+.app-root {
+  display: flex;
+  flex-direction: column;
+  height: 100svh;
+  overflow: hidden;
+}
+
+.app-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .view-switcher {
   display: flex;
+  flex-shrink: 0;
   gap: 8px;
   padding: 10px 24px;
   border-bottom: 1px solid var(--blue-mid);

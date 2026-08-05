@@ -17,7 +17,7 @@ function App() {
   const [theme, setTheme] = useTheme();
 
   return (
-    <>
+    <div className="app-root">
       <DecoDefs />
       <nav className="view-switcher">
         <button className={view === 'home' ? 'active' : 'ghost'} onClick={() => setView('home')}>
@@ -37,10 +37,12 @@ function App() {
           {CLERK_ENABLED && <AuthHeader />}
         </div>
       </nav>
-      {view === 'home' && <Home onNavigate={setView} />}
-      {view === 'deckbuilder' && <Deckbuilder />}
-      {view === 'board' && <Board onExit={() => setView('deckbuilder')} />}
-    </>
+      <div className="app-content">
+        {view === 'home' && <Home onNavigate={setView} />}
+        {view === 'deckbuilder' && <Deckbuilder />}
+        {view === 'board' && <Board onExit={() => setView('deckbuilder')} />}
+      </div>
+    </div>
   );
 }
 

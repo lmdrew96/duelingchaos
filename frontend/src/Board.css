@@ -1,8 +1,11 @@
+/* Fills .app-content exactly (App.css sizes that to the viewport minus the
+   nav) rather than re-claiming 100svh itself, which double-counted the nav's
+   height and pushed the page into an outer scroll. */
 .board-shell {
   position: relative;
   display: flex;
   flex-direction: column;
-  height: 100svh;
+  height: 100%;
   overflow: hidden;
   padding: 16px 24px;
   gap: 12px;
