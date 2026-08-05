@@ -14,6 +14,7 @@ import type {
 import { ManaPips } from './manaCost';
 import { CardArt } from './CardArt';
 import { CardHoverPreview } from './CardHoverPreview';
+import { clearMatchConfirmed } from './PlayGate';
 import { DecoCorners } from './DecoCorner';
 import { DecoCrown } from './DecoCrown';
 import { DecoRule } from './DecoRule';
@@ -814,6 +815,9 @@ export default function Board({ onExit }: { onExit: () => void }) {
           const human = s.players.find((p) => !p.isAI) ?? s.players[0];
           const won = !s.isDraw && s.winnerName != null && human != null && s.winnerName === human.name;
           api.reportMatchResult(won, s.isDraw);
+          // Next visit to the board should prompt for a fresh matchup
+          // instead of re-showing this finished game (see PlayGate/App.tsx).
+          clearMatchConfirmed();
         }
         // A board refresh can unmount the tile currently under the cursor
         // (e.g. a card changing zones) without ever firing onMouseLeave —

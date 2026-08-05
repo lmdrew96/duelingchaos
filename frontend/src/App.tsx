@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react';
 import Home from './Home';
 import Deckbuilder from './Deckbuilder';
 import Board from './Board';
+import PlayGate, { isMatchConfirmed } from './PlayGate';
 import { DecoDefs } from './DecoDefs';
 import { AuthHeader } from './AuthHeader';
 import { ThemeToggle } from './ThemeToggle';
@@ -35,6 +37,14 @@ function App() {
 
   const setView = (v: View) => navigate(PATH_FOR_VIEW[v]);
 
+  // Re-synced from sessionStorage every time /play is (re)entered — covers
+  // both a deck already having been picked before navigating here (Home's
+  // per-deck Play button) and PlayGate confirming one just now.
+  const [matchConfirmed, setMatchConfirmed] = useState(isMatchConfirmed);
+  useEffect(() => {
+    if (view === 'board') setMatchConfirmed(isMatchConfirmed());
+  }, [view]);
+
   return (
     <div className="app-root">
       <DecoDefs />
@@ -64,7 +74,12 @@ function App() {
             onDeckSelected={(name) => navigate(`/build/${encodeURIComponent(name)}`, { replace: true })}
           />
         )}
-        {view === 'board' && <Board onExit={() => setView('deckbuilder')} />}
+        {view === 'board' &&
+          (matchConfirmed ? (
+            <Board onExit={() => setView('deckbuilder')} />
+          ) : (
+            <PlayGate onConfirmed={() => setMatchConfirmed(true)} />
+          ))}
       </div>
     </div>
   );

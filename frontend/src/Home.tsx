@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth, SignInButton } from '@clerk/react';
 import * as api from './api';
 import type { DecksList, MatchStats } from './types';
+import { markMatchConfirmed } from './PlayGate';
 import { DecoCorners } from './DecoCorner';
 import { DecoCrown } from './DecoCrown';
 import { DecoRule } from './DecoRule';
@@ -118,7 +119,10 @@ function Dashboard({
     setStartError(null);
     getToken()
       .then((token) => api.startMatch(name, opponentDeck === 'random' ? undefined : opponentDeck, token))
-      .then(() => onNavigate('board'))
+      .then(() => {
+        markMatchConfirmed();
+        onNavigate('board');
+      })
       .catch(() => setStartError('Could not start a match with that deck.'))
       .finally(() => setStartingDeck(null));
   };
