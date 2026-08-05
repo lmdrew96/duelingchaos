@@ -139,6 +139,14 @@ function DeckbuilderCore({
 
   const deckSize = deckCards.reduce((sum, c) => sum + c.count, 0);
 
+  // Lets the search results list show "already in this deck" counts without
+  // an O(results × deckCards) scan per render.
+  const deckCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const c of deckCards) counts[c.name] = c.count;
+    return counts;
+  }, [deckCards]);
+
   const manaCurve = useMemo(() => {
     const buckets = new Array(CURVE_BUCKETS).fill(0);
     for (const dc of deckCards) {
@@ -257,7 +265,12 @@ function DeckbuilderCore({
               <div className="card-row" key={card.name} onClick={() => addCard(card.name, card)}>
                 <CardArt name={card.name} variant="crop" className="card-row-art" />
                 <div className="card-row-main">
-                  <div className="card-name">{card.name}</div>
+                  <div className="card-name">
+                    {card.name}
+                    {deckCounts[card.name] > 0 && (
+                      <span className="in-deck-badge">×{deckCounts[card.name]}</span>
+                    )}
+                  </div>
                   <div className="card-meta">
                     {card.type}
                     {card.power != null ? ` — ${card.power}/${card.toughness}` : ''}

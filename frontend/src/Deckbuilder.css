@@ -95,6 +95,13 @@
   font-weight: 500;
 }
 
+.in-deck-badge {
+  margin-left: 6px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--gold);
+}
+
 .card-meta {
   font-size: 0.78rem;
   color: var(--text-muted);
