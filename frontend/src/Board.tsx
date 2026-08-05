@@ -13,6 +13,7 @@ import type {
 } from './types';
 import { ManaPips } from './manaCost';
 import { CardArt } from './CardArt';
+import { CardHoverPreview } from './CardHoverPreview';
 import { DecoCorners } from './DecoCorner';
 import { DecoCrown } from './DecoCrown';
 import { DecoRule } from './DecoRule';
@@ -595,26 +596,6 @@ function CardDetailModal({ cardName, onClose }: { cardName: string; onClose: () 
           </>
         )}
       </div>
-    </div>
-  );
-}
-
-// Desktop-hover companion to CardDetailModal's click-to-pin: floats the full
-// card face beside the hovered tile so you can read it without leaving your
-// place on the board. Positioned from the tile's own rect (not the cursor)
-// so it doesn't jitter as the mouse moves within the tile, and clamped to
-// the viewport since tiles near an edge would otherwise push it off-screen.
-function CardHoverPreview({ name, anchor }: { name: string; anchor: HTMLElement }) {
-  const rect = anchor.getBoundingClientRect();
-  const width = 240;
-  let left = rect.right + 12;
-  if (left + width > window.innerWidth - 12) left = rect.left - width - 12;
-  left = Math.max(12, left);
-  const top = Math.min(Math.max(12, rect.top), window.innerHeight - 340);
-
-  return (
-    <div className="card-hover-preview" style={{ top, left, width }}>
-      <CardArt name={name} variant="full" className="card-hover-preview-art" />
     </div>
   );
 }

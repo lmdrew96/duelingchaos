@@ -213,6 +213,29 @@ select:focus {
   white-space: nowrap;
 }
 
+/* Shared by CardHoverPreview.tsx (Board + Deckbuilder) — floats the full
+   card face beside whatever tile/row is hovered. Only offered where hover
+   is a real pointer gesture — on touch, the existing "i" button /
+   CardDetailModal covers the same need. */
+.card-hover-preview {
+  position: fixed;
+  z-index: 30;
+  pointer-events: none;
+  border: 1px solid var(--gold);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+@media not all and (hover: hover) {
+  .card-hover-preview {
+    display: none;
+  }
+}
+
+.card-hover-preview-art {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+}
+
 /* Line-diamond-line divider — the reference kit's "ruler" motif, standing
    in for plain borders wherever a section break needs to read as chrome
    rather than just a layout seam. See DecoRule.tsx. */

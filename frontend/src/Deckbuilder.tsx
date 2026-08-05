@@ -4,6 +4,7 @@ import * as api from './api';
 import type { CardInfo, DeckCard, DecksList, Legality } from './types';
 import { ManaPips, manaValue } from './manaCost';
 import { CardArt } from './CardArt';
+import { CardHoverPreview } from './CardHoverPreview';
 import { DecoCorners } from './DecoCorner';
 import { DecoRule } from './DecoRule';
 import { DeckStats } from './DeckStats';
@@ -61,6 +62,7 @@ function DeckbuilderCore({
   const [decksList, setDecksList] = useState<DecksList>({ presets: [], saved: [] });
   const [loadFilter, setLoadFilter] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [hoverCard, setHoverCard] = useState<{ name: string; el: HTMLElement } | null>(null);
 
   const refreshDecksList = () => {
     getToken()
@@ -136,6 +138,14 @@ function DeckbuilderCore({
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deckCards, cardInfoCache]);
+
+  // A search re-query or deck edit can unmount the row currently under the
+  // cursor without ever firing onMouseLeave — drop the stale hover if its
+  // anchor is no longer in the document, or CardHoverPreview reads a zeroed
+  // rect from the dead node (same guard as Board's own hover state).
+  useEffect(() => {
+    setHoverCard((prev) => (prev && !document.contains(prev.el) ? null : prev));
+  }, [searchResults, deckCards]);
 
   // Sideboard cards aren't part of the deck actually being played.
   const deckSize = deckCards.filter((c) => c.section !== 'sideboard').reduce((sum, c) => sum + c.count, 0);
@@ -259,7 +269,12 @@ function DeckbuilderCore({
   };
 
   const renderDeckRow = (c: DeckCard) => (
-    <div className="deck-row" key={c.name}>
+    <div
+      className="deck-row"
+      key={c.name}
+      onMouseEnter={(e) => setHoverCard({ name: c.name, el: e.currentTarget })}
+      onMouseLeave={() => setHoverCard(null)}
+    >
       <CardArt name={c.name} variant="crop" className="deck-row-art" />
       <span className="deck-row-name">{c.name}</span>
       <div className="count-controls">
@@ -319,7 +334,13 @@ function DeckbuilderCore({
           />
           <div className="card-list">
             {searchResults.map((card) => (
-              <div className="card-row" key={card.name} onClick={() => addCard(card.name, card)}>
+              <div
+                className="card-row"
+                key={card.name}
+                onClick={() => addCard(card.name, card)}
+                onMouseEnter={(e) => setHoverCard({ name: card.name, el: e.currentTarget })}
+                onMouseLeave={() => setHoverCard(null)}
+              >
                 <CardArt name={card.name} variant="crop" className="card-row-art" />
                 <div className="card-row-main">
                   <div className="card-name">
@@ -464,6 +485,8 @@ function DeckbuilderCore({
           </div>
         </section>
       </div>
+
+      {hoverCard && <CardHoverPreview name={hoverCard.name} anchor={hoverCard.el} />}
     </div>
   );
 }

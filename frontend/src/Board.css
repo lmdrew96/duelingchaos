@@ -569,27 +569,6 @@
   gap: 8px;
 }
 
-/* Only offered where hover is a real pointer gesture — on touch, the
-   existing "i" button / CardDetailModal covers the same need. */
-.card-hover-preview {
-  position: fixed;
-  z-index: 30;
-  pointer-events: none;
-  border: 1px solid var(--gold);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
-}
-
-@media not all and (hover: hover) {
-  .card-hover-preview {
-    display: none;
-  }
-}
-
-.card-hover-preview-art {
-  width: 100%;
-  aspect-ratio: 5 / 7;
-}
-
 .graveyard-panel {
   width: min(560px, 92vw);
 }
