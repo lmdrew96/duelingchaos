@@ -22,26 +22,39 @@ const CURVE_BUCKETS = 8; // 0,1,2,3,4,5,6,7+
 // separate empty state).
 const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
-export default function Deckbuilder() {
+type DeckbuilderProps = {
+  // The saved deck to auto-load on mount — reflects /build/:deckName so a
+  // refresh or a shared link lands back on the same deck instead of blank.
+  deckName?: string;
+  // Fired whenever a saved deck becomes "the current one" (loaded or just
+  // saved), so the caller can sync the URL to it.
+  onDeckSelected?: (name: string) => void;
+};
+
+export default function Deckbuilder({ deckName, onDeckSelected }: DeckbuilderProps) {
   return CLERK_ENABLED ? (
-    <DeckbuilderWithAuth />
+    <DeckbuilderWithAuth deckName={deckName} onDeckSelected={onDeckSelected} />
   ) : (
-    <DeckbuilderCore getToken={async () => null} isSignedIn={false} />
+    <DeckbuilderCore getToken={async () => null} isSignedIn={false} deckName={deckName} onDeckSelected={onDeckSelected} />
   );
 }
 
-function DeckbuilderWithAuth() {
+function DeckbuilderWithAuth({ deckName, onDeckSelected }: DeckbuilderProps) {
   const { getToken, isSignedIn } = useAuth();
-  return <DeckbuilderCore getToken={getToken} isSignedIn={!!isSignedIn} />;
+  return (
+    <DeckbuilderCore getToken={getToken} isSignedIn={!!isSignedIn} deckName={deckName} onDeckSelected={onDeckSelected} />
+  );
 }
 
 function DeckbuilderCore({
   getToken,
   isSignedIn,
+  deckName: initialDeckName,
+  onDeckSelected,
 }: {
   getToken: () => Promise<string | null>;
   isSignedIn: boolean;
-}) {
+} & DeckbuilderProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<CardInfo[]>([]);
   const [searchTruncated, setSearchTruncated] = useState(false);
@@ -262,6 +275,7 @@ function DeckbuilderCore({
     await api.saveDeck(deckName.trim(), deckCards, format, token);
     setStatusMessage(`Saved "${deckName.trim()}".`);
     refreshDecksList();
+    onDeckSelected?.(deckName.trim());
   };
 
   const handleLoad = async (source: 'preset' | 'saved', name: string) => {
@@ -273,7 +287,21 @@ function DeckbuilderCore({
     // deck's format is still a real option in the current format list.
     if (deck.format && formats.includes(deck.format)) setFormat(deck.format);
     setStatusMessage(`Loaded "${deck.name}" (${source}).`);
+    if (source === 'saved') onDeckSelected?.(deck.name);
   };
+
+  // Reflects /build/:deckName — auto-loads once a Clerk session is actually
+  // established (getSavedDeck 401s without one). Re-runs if the URL's deck
+  // name changes out from under a mounted Deckbuilder (browser back/forward
+  // between two previously-visited decks); a no-op deps change (isSignedIn
+  // flipping true on initial auth resolution) just re-loads the same deck.
+  useEffect(() => {
+    if (!initialDeckName || !isSignedIn) return;
+    handleLoad('saved', initialDeckName).catch(() =>
+      setStatusMessage(`Could not load "${initialDeckName}".`),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDeckName, isSignedIn]);
 
   const handleDelete = async (name: string, event: React.MouseEvent) => {
     event.stopPropagation();

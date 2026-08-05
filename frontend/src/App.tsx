@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import Home from './Home';
 import Deckbuilder from './Deckbuilder';
 import Board from './Board';
@@ -6,15 +5,35 @@ import { DecoDefs } from './DecoDefs';
 import { AuthHeader } from './AuthHeader';
 import { ThemeToggle } from './ThemeToggle';
 import { useTheme } from './theme';
+import { useRoute } from './router';
 import './App.css';
 
 const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
+// Home/Board only ever navigate between the three base views (they don't
+// know or care about a deckbuilder deck-name suffix), so they keep this
+// simpler prop type — App is the only place path <-> view translation lives.
 type View = 'home' | 'deckbuilder' | 'board';
+const PATH_FOR_VIEW: Record<View, string> = { home: '/', deckbuilder: '/build', board: '/play' };
+
+function viewForPath(path: string): View {
+  if (path.startsWith('/build')) return 'deckbuilder';
+  if (path.startsWith('/play')) return 'board';
+  return 'home';
+}
 
 function App() {
-  const [view, setView] = useState<View>('home');
+  const { path, navigate } = useRoute();
   const [theme, setTheme] = useTheme();
+
+  const view = viewForPath(path);
+  // /build/:deckName — the saved deck the deckbuilder should auto-load on
+  // mount (see Deckbuilder's deckName/onDeckSelected props). Absent for a
+  // bare /build, and irrelevant off the deckbuilder route entirely.
+  const buildMatch = /^\/build\/(.+)$/.exec(path);
+  const deckName = buildMatch ? decodeURIComponent(buildMatch[1]) : undefined;
+
+  const setView = (v: View) => navigate(PATH_FOR_VIEW[v]);
 
   return (
     <div className="app-root">
@@ -39,7 +58,12 @@ function App() {
       </nav>
       <div className="app-content">
         {view === 'home' && <Home onNavigate={setView} />}
-        {view === 'deckbuilder' && <Deckbuilder />}
+        {view === 'deckbuilder' && (
+          <Deckbuilder
+            deckName={deckName}
+            onDeckSelected={(name) => navigate(`/build/${encodeURIComponent(name)}`, { replace: true })}
+          />
+        )}
         {view === 'board' && <Board onExit={() => setView('deckbuilder')} />}
       </div>
     </div>
