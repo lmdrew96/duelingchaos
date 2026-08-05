@@ -56,6 +56,45 @@
   color: var(--bg);
 }
 
+.pointer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Neutral tone deliberately — no red/amber alarm color, no shame language.
+   These flag something legal you could easily forget, not a mistake. */
+.pointer-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--blue-mid);
+  background: var(--bg-panel);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.pointer-chip-icon {
+  color: var(--gold);
+  font-size: 0.6em;
+}
+
+.pointer-chip-dismiss {
+  border: none;
+  padding: 0 2px;
+  color: var(--text-muted);
+  font-size: 0.9em;
+  line-height: 1;
+}
+
+.pointer-chip-dismiss:hover {
+  background: transparent;
+  color: var(--gold);
+}
+
 .board-error {
   text-align: center;
   color: var(--danger);
@@ -128,6 +167,30 @@
   flex-wrap: wrap;
   gap: 8px;
   min-height: 84px;
+}
+
+.battlefield-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.battlefield-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.battlefield-group .card-row {
+  min-height: 0;
+}
+
+.battlefield-group-label {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* A repeated grid (a dozen-plus of these on screen at once) stays plain —
@@ -206,6 +269,11 @@
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
+  padding-right: 12px;
+}
+
+.card-tile-cost {
+  align-self: flex-start;
 }
 
 .card-tile-pt {
@@ -213,6 +281,99 @@
   font-family: var(--mono);
   font-size: 0.7rem;
   color: var(--gold);
+}
+
+/* Its own click target, deliberately separate from the tile's tap/select
+   click — overloading a single click to mean both "tap this land" and
+   "show me its text" is exactly the kind of ambiguity worth avoiding. */
+.card-tile-info {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--blue-muted);
+  color: var(--text-muted);
+  background: var(--bg-panel);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-tile-info:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: var(--bg-panel);
+}
+
+.card-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 16, 20, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+}
+
+.card-detail-panel {
+  position: relative;
+  width: min(420px, 90vw);
+  max-height: 80vh;
+  overflow-y: auto;
+  border: 1px solid var(--gold);
+  box-shadow: inset 0 0 0 4px var(--bg-panel), inset 0 0 0 5px var(--blue-mid);
+  background: var(--bg-panel);
+  padding: 18px 22px;
+}
+
+.card-detail-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 3px 12px;
+  font-size: 0.72rem;
+}
+
+.card-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 24px 8px 0;
+}
+
+.card-detail-name {
+  font-size: 1rem;
+  color: var(--gold);
+}
+
+.card-detail-type {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
+.card-detail-oracle {
+  font-size: 0.85rem;
+  color: var(--text);
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.card-detail-pt {
+  align-self: flex-end;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--gold);
+  text-align: right;
+  margin: 12px 0 0;
 }
 
 .card-back {

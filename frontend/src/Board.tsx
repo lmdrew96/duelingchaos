@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as api from './api';
-import type { BoardCard, EntityRef, GameState, PendingChoice, PlayerState, StackItem } from './types';
+import type { BoardCard, CardInfo, EntityRef, GameState, PendingChoice, PlayerState, PointerInfo, StackItem } from './types';
+import { ManaPips } from './manaCost';
 import './Board.css';
 
 const POLL_INTERVAL_MS = 1000;
@@ -79,12 +80,14 @@ function CardTile({
   onClick,
   targetable,
   registerRef,
+  onInfoClick,
 }: {
   card: BoardCard;
   index: number;
   onClick?: (index: number) => void;
   targetable?: boolean;
   registerRef?: (el: HTMLElement | null) => void;
+  onInfoClick?: (name: string) => void;
 }) {
   const showPT = card.power !== 0 || card.toughness !== 0;
   return (
@@ -93,7 +96,25 @@ function CardTile({
       className={`card-tile${card.tapped ? ' tapped' : ''}${onClick ? ' clickable' : ''}${targetable ? ' targetable' : ''}`}
       onClick={onClick ? () => onClick(index) : undefined}
     >
+      {onInfoClick && (
+        <button
+          type="button"
+          className="card-tile-info"
+          onClick={(e) => {
+            e.stopPropagation();
+            onInfoClick(card.name);
+          }}
+          aria-label={`View ${card.name} details`}
+        >
+          i
+        </button>
+      )}
       <div className="card-tile-name">{card.name}</div>
+      {card.manaCost && (
+        <div className="card-tile-cost">
+          <ManaPips cost={card.manaCost} size="sm" />
+        </div>
+      )}
       {showPT && (
         <div className="card-tile-pt">
           {card.power}/{card.toughness}
@@ -102,6 +123,19 @@ function CardTile({
     </div>
   );
 }
+
+// Row order and display labels for battlefield grouping — matches the
+// bridge's typeCategory precedence (Creature checked before Artifact/Land
+// so multi-type permanents land with their creature-specific mechanics).
+const TYPE_GROUP_ORDER: [string, string][] = [
+  ['Land', 'Lands'],
+  ['Creature', 'Creatures'],
+  ['Planeswalker', 'Planeswalkers'],
+  ['Artifact', 'Artifacts'],
+  ['Enchantment', 'Enchantments'],
+  ['Battle', 'Battles'],
+  ['Other', 'Other'],
+];
 
 function CardBacks({ count }: { count: number }) {
   return (
@@ -155,6 +189,7 @@ function PlayerZone({
   onEntityClick,
   onEntityFallbackClick,
   registerElementRef,
+  onInfoClick,
 }: {
   player: PlayerState;
   faceDownHand: boolean;
@@ -167,6 +202,7 @@ function PlayerZone({
   // as a "maybe this is legal" attempt; Forge silently no-ops an illegal one.
   onEntityFallbackClick?: (ref: EntityRef) => void;
   registerElementRef: (key: EntityRef, el: HTMLElement | null) => void;
+  onInfoClick?: (name: string) => void;
 }) {
   const playerRef: EntityRef = `player:${player.id}`;
   const playerTargetable = targetableRefs?.has(playerRef) ?? false;
@@ -193,20 +229,38 @@ function PlayerZone({
           <span>graveyard {player.graveyard.length}</span>
         </span>
       </div>
-      <div className="card-row">
-        {player.battlefield.map((c, i) => {
-          const ref: EntityRef = `card:${c.id}`;
-          const targetable = targetableRefs?.has(ref) ?? false;
-          const fallbackClick = onEntityFallbackClick ? () => onEntityFallbackClick(ref) : undefined;
+      {/* A single wrapping div, not one flex child per group — .opponent-zone
+          reverses flex-direction so the opponent's hand renders near the
+          middle of the screen, and that reversal would otherwise scramble
+          TYPE_GROUP_ORDER's fixed sequence for every direct sibling too. */}
+      <div className="battlefield-groups">
+        {TYPE_GROUP_ORDER.map(([category, label]) => {
+          const entries = player.battlefield
+            .map((c, i) => ({ c, i }))
+            .filter(({ c }) => (c.typeCategory || 'Other') === category);
+          if (entries.length === 0) return null;
           return (
-            <CardTile
-              card={c}
-              index={i}
-              onClick={targetable ? () => onEntityClick?.(ref) : (onBattlefieldClick ?? fallbackClick)}
-              targetable={targetable}
-              registerRef={(el) => registerElementRef(ref, el)}
-              key={ref}
-            />
+            <div className="battlefield-group" key={category}>
+              <span className="battlefield-group-label">{label}</span>
+              <div className="card-row">
+                {entries.map(({ c, i }) => {
+                  const ref: EntityRef = `card:${c.id}`;
+                  const targetable = targetableRefs?.has(ref) ?? false;
+                  const fallbackClick = onEntityFallbackClick ? () => onEntityFallbackClick(ref) : undefined;
+                  return (
+                    <CardTile
+                      card={c}
+                      index={i}
+                      onClick={targetable ? () => onEntityClick?.(ref) : (onBattlefieldClick ?? fallbackClick)}
+                      targetable={targetable}
+                      registerRef={(el) => registerElementRef(ref, el)}
+                      onInfoClick={onInfoClick}
+                      key={ref}
+                    />
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
       </div>
@@ -216,7 +270,7 @@ function PlayerZone({
           <CardBacks count={player.hand.length} />
         ) : (
           player.hand.map((c, i) => (
-            <CardTile card={c} index={i} onClick={onHandClick} key={`${c.name}-${i}`} />
+            <CardTile card={c} index={i} onClick={onHandClick} onInfoClick={onInfoClick} key={`${c.name}-${i}`} />
           ))
         )}
       </div>
@@ -350,6 +404,113 @@ function ChoicePanel({
   );
 }
 
+// The board only ever knows a card's name/P&T/tapped-state from the live
+// game view — full oracle text/type isn't part of that payload, so this
+// looks the card up through the same /cards/search the deckbuilder uses.
+function CardDetailModal({ cardName, onClose }: { cardName: string; onClose: () => void }) {
+  const [detail, setDetail] = useState<CardInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setDetail(null);
+    setNotFound(false);
+    api
+      .getCardDetail(cardName)
+      .then((c) => {
+        if (cancelled) return;
+        if (c) setDetail(c);
+        else setNotFound(true);
+      })
+      .catch(() => {
+        if (!cancelled) setNotFound(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cardName]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div className="card-detail-backdrop" onClick={onClose}>
+      <div className="card-detail-panel" onClick={(e) => e.stopPropagation()}>
+        <DecoCorners />
+        <button type="button" className="ghost card-detail-close" onClick={onClose}>
+          close
+        </button>
+        {loading && <p className="choice-hint">Loading…</p>}
+        {!loading && notFound && <p className="choice-hint">No card data found for "{cardName}".</p>}
+        {!loading && detail && (
+          <>
+            <div className="card-detail-header">
+              <span className="card-detail-name">{detail.name}</span>
+              <ManaPips cost={detail.manaCost} size="md" />
+            </div>
+            <p className="card-detail-type">{detail.type}</p>
+            <p className="card-detail-oracle">{detail.oracleText}</p>
+            {detail.power != null && (
+              <p className="card-detail-pt">
+                {detail.power}/{detail.toughness}
+              </p>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Non-blocking, dismissible nudges for legal-but-easy-to-forget options
+// (land drop, an unused instant) — never a rules warning, since Forge
+// enforces those itself. Dismissal is per-instance, not persisted: once the
+// underlying condition clears (id drops out of state.pointers) and later
+// recurs (e.g. next turn's land drop), it's no longer in dismissedIds and
+// reappears — see the pruning effect in Board().
+function PointerBar({
+  pointers,
+  dismissedIds,
+  onDismiss,
+}: {
+  pointers: PointerInfo[];
+  dismissedIds: Set<string>;
+  onDismiss: (id: string) => void;
+}) {
+  const visible = pointers.filter((p) => !dismissedIds.has(p.id));
+  if (visible.length === 0) return null;
+  return (
+    <div className="pointer-bar">
+      {visible.map((p) => (
+        <div className="pointer-chip" key={p.id}>
+          <span className="pointer-chip-icon" aria-hidden>
+            ◆
+          </span>
+          <span className="pointer-chip-message">{p.message}</span>
+          <button
+            type="button"
+            className="pointer-chip-dismiss"
+            onClick={() => onDismiss(p.id)}
+            aria-label="Dismiss reminder"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type Arrow = { x1: number; y1: number; x2: number; y2: number; dashed: boolean };
 
 export default function Board() {
@@ -358,6 +519,8 @@ export default function Board() {
   const inFlight = useRef(false);
   const [selected, setSelected] = useState<number[]>([]);
   const [arrows, setArrows] = useState<Arrow[]>([]);
+  const [detailCardName, setDetailCardName] = useState<string | null>(null);
+  const [dismissedPointerIds, setDismissedPointerIds] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
   // Maps "card:<id>" / "player:<id>" to its rendered element — populated by
   // ref callbacks on CardTile/life-badge/stack-tile as they mount, read back
@@ -374,6 +537,14 @@ export default function Board() {
       .then((s) => {
         setState(s);
         setError(null);
+        // Drop dismissals whose condition no longer holds, so the same id
+        // (e.g. "land-drop") can nudge again once it recurs next turn,
+        // instead of staying silently dismissed forever.
+        const activeIds = new Set(s.pointers.map((p) => p.id));
+        setDismissedPointerIds((prev) => {
+          const next = new Set([...prev].filter((id) => activeIds.has(id)));
+          return next.size === prev.size ? prev : next;
+        });
       })
       .catch(() => setError('Could not reach the bridge — is the game running?'));
   };
@@ -518,6 +689,14 @@ export default function Board() {
         </button>
       </div>
 
+      {!choice && !prompt?.message && (
+        <PointerBar
+          pointers={state.pointers}
+          dismissedIds={dismissedPointerIds}
+          onDismiss={(id) => setDismissedPointerIds((prev) => new Set(prev).add(id))}
+        />
+      )}
+
       {opponent && (
         <PlayerZone
           player={opponent}
@@ -526,6 +705,7 @@ export default function Board() {
           onEntityClick={onEntityClick}
           onEntityFallbackClick={choice ? undefined : (ref) => runAction(() => api.selectEntity(ref))}
           registerElementRef={registerElementRef}
+          onInfoClick={setDetailCardName}
         />
       )}
 
@@ -541,6 +721,7 @@ export default function Board() {
           onEntityClick={onEntityClick}
           onEntityFallbackClick={choice ? undefined : (ref) => runAction(() => api.selectEntity(ref))}
           registerElementRef={registerElementRef}
+          onInfoClick={setDetailCardName}
         />
       )}
 
@@ -592,6 +773,10 @@ export default function Board() {
             />
           ))}
         </svg>
+      )}
+
+      {detailCardName && (
+        <CardDetailModal cardName={detailCardName} onClose={() => setDetailCardName(null)} />
       )}
     </div>
   );

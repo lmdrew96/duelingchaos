@@ -11,6 +11,15 @@ export async function searchCards(query: string, limit = 40): Promise<CardInfo[]
   return res.json();
 }
 
+// /cards/search matches by substring, not exact name — a board card's name
+// is always a real card name though, so an exact case-insensitive match
+// (falling back to the first hit) reliably resolves it to its full detail.
+export async function getCardDetail(name: string): Promise<CardInfo | null> {
+  const results = await searchCards(name, 5);
+  if (results.length === 0) return null;
+  return results.find((c) => c.name.toLowerCase() === name.toLowerCase()) ?? results[0];
+}
+
 export async function listFormats(): Promise<string[]> {
   const res = await fetch(`${BASE}/formats/list`);
   return res.json();

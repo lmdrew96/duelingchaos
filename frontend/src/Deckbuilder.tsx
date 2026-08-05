@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as api from './api';
 import type { CardInfo, DeckCard, DecksList, Legality } from './types';
+import { ManaPips } from './manaCost';
 import './Deckbuilder.css';
 
 export default function Deckbuilder() {
@@ -31,9 +32,17 @@ export default function Deckbuilder() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The debounce timer alone can't prevent every race — a slow response to
+  // an older query can still land after a faster response to a newer one.
+  // requestId guards against that: only the most recently *fired* search
+  // is allowed to write its results.
+  const searchRequestId = useRef(0);
   useEffect(() => {
     const handle = setTimeout(() => {
-      api.searchCards(searchQuery, 40).then(setSearchResults);
+      const requestId = ++searchRequestId.current;
+      api.searchCards(searchQuery, 40).then((results) => {
+        if (requestId === searchRequestId.current) setSearchResults(results);
+      });
     }, 200);
     return () => clearTimeout(handle);
   }, [searchQuery]);
@@ -135,7 +144,7 @@ export default function Deckbuilder() {
                   </div>
                   <div className="card-oracle">{card.oracleText}</div>
                 </div>
-                <span className="mana-cost">{card.manaCost}</span>
+                <ManaPips cost={card.manaCost} size="md" />
               </div>
             ))}
             {searchResults.length === 0 && (

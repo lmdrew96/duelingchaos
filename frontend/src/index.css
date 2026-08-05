@@ -98,3 +98,48 @@ select:focus {
 .mono {
   font-family: var(--mono);
 }
+
+.mana-pip-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.mana-pip-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-family: var(--mono);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.mana-pip-sm.sm {
+  width: 13px;
+  height: 13px;
+  font-size: 0.5rem;
+}
+
+.mana-pip-sm.md {
+  width: 20px;
+  height: 20px;
+  font-size: 0.68rem;
+}
+
+.mana-pip-sm.pip-w { background: #f8f6d8; color: #08262d; }
+.mana-pip-sm.pip-u { background: #0e68ab; color: #ebe7d9; }
+.mana-pip-sm.pip-b { background: #150b00; color: #ebe7d9; }
+.mana-pip-sm.pip-r { background: #d3202a; color: #ebe7d9; }
+.mana-pip-sm.pip-g { background: #00733e; color: #ebe7d9; }
+.mana-pip-sm.pip-c { background: #bdbdbd; color: #08262d; }
+.mana-pip-sm.pip-generic { background: var(--blue-muted); color: var(--text); }
+
+.mana-pip-text {
+  font-family: var(--mono);
+  color: var(--gold);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}

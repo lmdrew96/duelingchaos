@@ -1,11 +1,17 @@
 package dev.duelingchaos.bridge;
 
+import forge.card.CardTypeView;
+import forge.card.mana.ManaCost;
 import forge.game.GameView;
 import forge.game.card.CardView;
+import forge.game.phase.PhaseType;
 import forge.game.player.PlayerView;
 import forge.game.spellability.StackItemView;
 import forge.game.zone.ZoneType;
 import forge.util.collect.FCollectionView;
+
+import java.util.ArrayList;
+import java.util.List;
 
 // Minimal hand-rolled JSON writer: the state shape here is small and fixed,
 // so a real JSON library isn't worth the extra dependency yet.
@@ -21,6 +27,7 @@ public final class GameStateJson {
         field(sb, "gameOver", game.isGameOver()); sb.append(',');
         sb.append("\"pendingPrompt\":"); writePendingPrompt(sb, gui); sb.append(',');
         sb.append("\"pendingChoice\":"); writePendingChoice(sb, gui); sb.append(',');
+        sb.append("\"pointers\":"); writePointers(sb, game); sb.append(',');
 
         sb.append("\"players\":[");
         boolean first = true;
@@ -103,6 +110,55 @@ public final class GameStateJson {
         sb.append('}');
     }
 
+    // Dismissible, non-blocking reminders for legal-but-easy-to-forget
+    // options — NOT rule-violation warnings (Forge already enforces those
+    // itself; the frontend just gets a rejected action if it tries
+    // something illegal). Scoped to the two cheapest conditions to detect
+    // from data Forge already tracks per player: an unplayed land drop, and
+    // an instant sitting unused in hand while the human holds priority
+    // during the opponent's turn (the moment most likely to be forgotten,
+    // since nothing else is prompting for input then).
+    private static void writePointers(StringBuilder sb, GameView game) {
+        PlayerView human = null;
+        for (PlayerView p : game.getPlayers()) {
+            if (!p.isAI()) { human = p; break; }
+        }
+
+        List<String[]> pointers = new ArrayList<>();
+        if (human != null) {
+            boolean isHumanTurn = game.getPlayerTurn() != null && game.getPlayerTurn().getId() == human.getId();
+            PhaseType phase = game.getPhase();
+            boolean hasLandInHand = false;
+            boolean hasInstantInHand = false;
+            for (CardView c : human.getHand()) {
+                CardTypeView t = c.getCurrentState().getType();
+                if (t == null) continue;
+                if (t.isLand()) hasLandInHand = true;
+                if (t.isInstant()) hasInstantInHand = true;
+            }
+            boolean canPlayLand = human.hasUnlimitedLandPlay() || human.getNumLandThisTurn() < human.getMaxLandPlay();
+
+            if (isHumanTurn && phase != null && phase.isMain() && human.getHasPriority() && canPlayLand && hasLandInHand) {
+                pointers.add(new String[] { "land-drop", "You haven't played a land this turn." });
+            }
+            if (!isHumanTurn && human.getHasPriority() && hasInstantInHand) {
+                pointers.add(new String[] { "instant-available", "You have priority and an instant in hand." });
+            }
+        }
+
+        sb.append('[');
+        boolean first = true;
+        for (String[] p : pointers) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append('{');
+            field(sb, "id", p[0]); sb.append(',');
+            field(sb, "message", p[1]);
+            sb.append('}');
+        }
+        sb.append(']');
+    }
+
     // Each item carries a source (the spell/ability asking) and its already-
     // declared targets, straight from Forge's own StackItemView — real data,
     // not a frontend guess, so targeting arrows for resolving spells are
@@ -155,10 +211,32 @@ public final class GameStateJson {
             field(sb, "name", c.getCurrentState().getName()); sb.append(',');
             field(sb, "tapped", c.isTapped()); sb.append(',');
             field(sb, "power", c.getCurrentState().getPower()); sb.append(',');
-            field(sb, "toughness", c.getCurrentState().getToughness());
+            field(sb, "toughness", c.getCurrentState().getToughness()); sb.append(',');
+            ManaCost manaCost = c.getCurrentState().getManaCost();
+            field(sb, "manaCost", manaCost == null ? "" : manaCost.toString()); sb.append(',');
+            field(sb, "typeCategory", typeCategory(c.getCurrentState().getType()));
             sb.append('}');
         }
         sb.append(']');
+    }
+
+    // Board grouping only needs one bucket per permanent, not a full type
+    // line — Forge's CardTypeView already exposes exact boolean predicates
+    // (isCreature/isLand/etc), so there's no need to parse a type-line
+    // string client-side the way oracle-text-only tools have to. Creature
+    // is checked before Artifact/Enchantment/Land so a multi-type permanent
+    // (e.g. an artifact creature, or the rare land creature) groups with
+    // its creature-specific mechanics (summoning sickness, combat) rather
+    // than its other type.
+    private static String typeCategory(CardTypeView t) {
+        if (t == null) return "Other";
+        if (t.isCreature()) return "Creature";
+        if (t.isPlaneswalker()) return "Planeswalker";
+        if (t.isBattle()) return "Battle";
+        if (t.isLand()) return "Land";
+        if (t.isArtifact()) return "Artifact";
+        if (t.isEnchantment()) return "Enchantment";
+        return "Other";
     }
 
     private static void field(StringBuilder sb, String key, String value) {

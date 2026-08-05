@@ -27,6 +27,8 @@ export type BoardCard = {
   tapped: boolean;
   power: number;
   toughness: number;
+  manaCost: string;
+  typeCategory: string;
 };
 
 export type PlayerState = {
@@ -78,6 +80,13 @@ export type PendingChoice = {
   sourceRef: EntityRef | null;
 };
 
+// Dismissible reminder chips for legal-but-easy-to-forget options (unplayed
+// land drop, an unused instant during the opponent's turn) — not rule
+// warnings, Forge enforces those itself. Computed bridge-side from data
+// (priority, land-drop count, hand contents) the frontend doesn't otherwise
+// have; see GameStateJson.writePointers.
+export type PointerInfo = { id: string; message: string };
+
 export type GameState = {
   turn: number;
   phase: string;
@@ -85,6 +94,7 @@ export type GameState = {
   gameOver: boolean;
   pendingPrompt: PendingPrompt;
   pendingChoice: PendingChoice | null;
+  pointers: PointerInfo[];
   players: PlayerState[];
   stack: StackItem[];
 };

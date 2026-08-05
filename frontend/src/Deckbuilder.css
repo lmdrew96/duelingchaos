@@ -98,14 +98,6 @@
   overflow: hidden;
 }
 
-.mana-cost {
-  font-family: var(--mono);
-  color: var(--gold);
-  font-size: 0.85rem;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
 .deck-header {
   display: flex;
   justify-content: space-between;
