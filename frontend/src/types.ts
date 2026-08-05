@@ -16,6 +16,9 @@ export type DeckSummary = { name: string; deckSize: number; cards: DeckCard[] };
 
 export type DecksList = { presets: string[]; saved: string[] };
 
+export type MatchHistoryEntry = { deckName: string; won: boolean; isDraw: boolean; playedAt: string };
+export type MatchStats = { wins: number; losses: number; draws: number; recent: MatchHistoryEntry[] };
+
 export type Legality = {
   legal: boolean;
   deckSize: number;

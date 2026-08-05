@@ -16,21 +16,33 @@ function getSql(): ReturnType<typeof neon> {
 
 let schemaReady: Promise<void> | null = null;
 
-// One-table schema — no migration framework needed at this size (see
-// CLAUDE.md: match the fix to the problem). Re-run is idempotent.
+// No migration framework needed at this size (see CLAUDE.md: match the fix
+// to the problem). Re-run is idempotent.
 export function ensureSchema(): Promise<void> {
   if (!schemaReady) {
-    schemaReady = getSql()`
-      CREATE TABLE IF NOT EXISTS decks (
-        id SERIAL PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        cards JSONB NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        UNIQUE (user_id, name)
-      )
-    `.then(() => undefined);
+    schemaReady = (async () => {
+      await getSql()`
+        CREATE TABLE IF NOT EXISTS decks (
+          id SERIAL PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          cards JSONB NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          UNIQUE (user_id, name)
+        )
+      `;
+      await getSql()`
+        CREATE TABLE IF NOT EXISTS match_results (
+          id SERIAL PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          deck_name TEXT NOT NULL,
+          won BOOLEAN NOT NULL,
+          is_draw BOOLEAN NOT NULL,
+          played_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `;
+    })();
   }
   return schemaReady;
 }
@@ -73,4 +85,42 @@ export async function deleteDeck(userId: string, name: string): Promise<boolean>
     DELETE FROM decks WHERE user_id = ${userId} AND name = ${name} RETURNING id
   `) as { id: number }[];
   return rows.length > 0;
+}
+
+export async function recordMatchResult(
+  userId: string,
+  deckName: string,
+  won: boolean,
+  isDraw: boolean,
+): Promise<void> {
+  await ensureSchema();
+  await getSql()`
+    INSERT INTO match_results (user_id, deck_name, won, is_draw)
+    VALUES (${userId}, ${deckName}, ${won}, ${isDraw})
+  `;
+}
+
+export type MatchHistoryEntry = { deckName: string; won: boolean; isDraw: boolean; playedAt: string };
+export type MatchStats = { wins: number; losses: number; draws: number; recent: MatchHistoryEntry[] };
+
+export async function getMatchStats(userId: string): Promise<MatchStats> {
+  await ensureSchema();
+  const countRows = (await getSql()`
+    SELECT
+      COUNT(*) FILTER (WHERE is_draw) AS draws,
+      COUNT(*) FILTER (WHERE won AND NOT is_draw) AS wins,
+      COUNT(*) FILTER (WHERE NOT won AND NOT is_draw) AS losses
+    FROM match_results WHERE user_id = ${userId}
+  `) as { wins: string; losses: string; draws: string }[];
+  const recentRows = (await getSql()`
+    SELECT deck_name, won, is_draw, played_at FROM match_results
+    WHERE user_id = ${userId} ORDER BY played_at DESC LIMIT 10
+  `) as { deck_name: string; won: boolean; is_draw: boolean; played_at: string }[];
+  const counts = countRows[0];
+  return {
+    wins: Number(counts?.wins ?? 0),
+    losses: Number(counts?.losses ?? 0),
+    draws: Number(counts?.draws ?? 0),
+    recent: recentRows.map((r) => ({ deckName: r.deck_name, won: r.won, isDraw: r.is_draw, playedAt: r.played_at })),
+  };
 }

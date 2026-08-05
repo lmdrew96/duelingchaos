@@ -3,7 +3,15 @@ import * as fs from 'fs';
 import * as http from 'http';
 import * as path from 'path';
 import { getUserId } from './auth';
-import { deleteDeck, getSavedDeck, listSavedDeckNames, saveDeck, StoredDeckCard } from './db';
+import {
+  deleteDeck,
+  getMatchStats,
+  getSavedDeck,
+  listSavedDeckNames,
+  recordMatchResult,
+  saveDeck,
+  StoredDeckCard,
+} from './db';
 
 const PROJECT_ROOT = path.join(__dirname, '..');
 
@@ -22,17 +30,27 @@ const DECKS_DIR = path.join(PROJECT_ROOT, 'decks');
 const JAVA_PORT = 8787;
 const HTTP_PORT = Number(process.env.PORT) || 4310;
 
-// Phase 1/2 spike decks — hardcoded until the deckbuilder patch lands.
-// Seat 1 (human, driven over HTTP) vs seat 2 (AI).
+// Phase 1/2 spike decks — default boot pairing, also the fixed AI opponent
+// for a match started from a saved deck (see startMatch).
 const DECK1 = 'res/quest/precons/Gruul Goliaths.dck';
 const DECK2 = 'res/quest/precons/Symbiotic Swarm.dck';
 
-function startForgeShim(): Promise<ChildProcessWithoutNullStreams> {
+// Reassigned by restartMatch() when a match is started from a saved deck —
+// the running Java process is killed and a fresh one spawned with the
+// chosen deck, reusing the same JAVA_PORT.
+let forgeProcess: ChildProcessWithoutNullStreams | null = null;
+
+// Tracks the deck/user behind the currently-running match so game-over can
+// be recorded exactly once (see handleMatchReport). Null for the default
+// boot pairing, which isn't tied to a saved deck or a signed-in user.
+let currentMatch: { userId: string; deckName: string; reported: boolean } | null = null;
+
+function startForgeShim(deck1: string, deck2: string): Promise<ChildProcessWithoutNullStreams> {
   return new Promise((resolve, reject) => {
     const classpath = `${FORGE_JAR}:${SHIM_BUILD_DIR}`;
     const child = spawn(
       'java',
-      ['-cp', classpath, 'dev.duelingchaos.bridge.BridgeMain', DECK1, DECK2, String(JAVA_PORT), DECKS_DIR],
+      ['-cp', classpath, 'dev.duelingchaos.bridge.BridgeMain', deck1, deck2, String(JAVA_PORT), DECKS_DIR],
       { cwd: FORGE_DIR },
     );
 
@@ -54,6 +72,39 @@ function startForgeShim(): Promise<ChildProcessWithoutNullStreams> {
       }
     });
   });
+}
+
+// Kills the running shim and waits for the OS to actually release JAVA_PORT
+// before spawning the replacement — starting the new process too early would
+// race the old one for the port. Any in-flight request during this window
+// gets the existing "Forge shim unreachable" 502 from proxyToShim, which the
+// board already renders as a retry-able error.
+async function restartMatch(deck1: string, deck2: string): Promise<void> {
+  if (forgeProcess) {
+    const dying = forgeProcess;
+    await new Promise<void>((resolve) => {
+      dying.once('exit', () => resolve());
+      dying.kill();
+    });
+  }
+  forgeProcess = await startForgeShim(deck1, deck2);
+}
+
+// Forge has no classes reachable from Node to serialize a real .dck file, so
+// a saved deck's cards go out as a plain "N Card Name" decklist instead —
+// BridgeMain.loadDeck() recognizes the .decklist.txt extension and parses it
+// with the same CardPool.fromCardList Forge already uses for pasted
+// decklists. Single fixed filename: only one match runs at a time, so each
+// new match just overwrites the last one's file.
+const HUMAN_DECKLIST_PATH = path.join(DECKS_DIR, 'tmp-match.decklist.txt');
+
+function writeHumanDecklist(cards: StoredDeckCard[]): string {
+  if (!fs.existsSync(DECKS_DIR)) {
+    fs.mkdirSync(DECKS_DIR, { recursive: true });
+  }
+  const text = cards.map((c) => `${c.count} ${c.name}`).join('\n');
+  fs.writeFileSync(HUMAN_DECKLIST_PATH, text);
+  return HUMAN_DECKLIST_PATH;
 }
 
 function proxyToShim(
@@ -208,8 +259,76 @@ async function handleDeckDelete(req: http.IncomingMessage, res: http.ServerRespo
   respondJson(res, 200, { deleted });
 }
 
+// Starts a new match against the fixed AI precon using a signed-in user's
+// saved deck — restarts the single Java shim process with that deck instead
+// of the boot-time hardcoded pairing (see the "Start a match from a saved
+// deck" ChaosPatch scoping decision: opponent selection stayed out of scope).
+async function handleMatchStart(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  if (req.method !== 'POST') {
+    respondJson(res, 405, { error: 'POST only' });
+    return;
+  }
+  const userId = await getUserId(req);
+  if (!userId) {
+    respondJson(res, 401, { error: 'sign in required to start a match' });
+    return;
+  }
+  const body = await readRequestBody(req);
+  let deckName: string | undefined;
+  try {
+    deckName = (JSON.parse(body) as { deckName?: string }).deckName;
+  } catch {
+    respondJson(res, 400, { error: 'invalid JSON body' });
+    return;
+  }
+  if (!deckName) {
+    respondJson(res, 400, { error: 'missing deckName' });
+    return;
+  }
+  const deck = await getSavedDeck(userId, deckName);
+  if (!deck) {
+    respondJson(res, 404, { error: 'deck not found' });
+    return;
+  }
+  const humanDeckPath = writeHumanDecklist(deck.cards);
+  await restartMatch(humanDeckPath, DECK2);
+  currentMatch = { userId, deckName, reported: false };
+  respondJson(res, 200, { ok: true });
+}
+
+// Fired once by the frontend when it observes gameOver in the polled game
+// state (same "confirm from the client" pattern as concede) — records
+// against whatever match is currently tracked, or no-ops if the running game
+// isn't tied to a saved deck (the boot-time default pairing) or was already
+// reported.
+async function handleMatchReport(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  if (req.method !== 'POST') {
+    respondJson(res, 405, { error: 'POST only' });
+    return;
+  }
+  if (!currentMatch || currentMatch.reported) {
+    respondJson(res, 200, { recorded: false });
+    return;
+  }
+  const body = await readRequestBody(req);
+  const { won, isDraw } = JSON.parse(body) as { won: boolean; isDraw: boolean };
+  currentMatch.reported = true;
+  await recordMatchResult(currentMatch.userId, currentMatch.deckName, won, isDraw);
+  respondJson(res, 200, { recorded: true });
+}
+
+async function handleMatchStats(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+  const userId = await getUserId(req);
+  if (!userId) {
+    respondJson(res, 401, { error: 'sign in required' });
+    return;
+  }
+  const stats = await getMatchStats(userId);
+  respondJson(res, 200, stats);
+}
+
 async function main(): Promise<void> {
-  const forgeProcess = await startForgeShim();
+  forgeProcess = await startForgeShim(DECK1, DECK2);
   console.log('Forge shim ready.');
 
   const server = http.createServer((req, res) => {
@@ -246,6 +365,27 @@ async function main(): Promise<void> {
         });
         return;
       }
+      if (shimRoute === '/match/start' && req.method === 'POST') {
+        handleMatchStart(req, res).catch((err) => {
+          console.error('match start failed:', err);
+          respondJson(res, 500, { error: 'failed to start match' });
+        });
+        return;
+      }
+      if (shimRoute === '/match/report' && req.method === 'POST') {
+        handleMatchReport(req, res).catch((err) => {
+          console.error('match report failed:', err);
+          respondJson(res, 500, { error: 'failed to record match result' });
+        });
+        return;
+      }
+      if (shimRoute === '/match/stats' && req.method === 'GET') {
+        handleMatchStats(req, res).catch((err) => {
+          console.error('match stats failed:', err);
+          respondJson(res, 500, { error: 'failed to load match stats' });
+        });
+        return;
+      }
 
       proxyToShim(req, res, shimPath, req.method);
       return;
@@ -256,7 +396,7 @@ async function main(): Promise<void> {
 
   server.on('error', (err) => {
     console.error('Bridge server error:', err);
-    forgeProcess.kill();
+    forgeProcess?.kill();
     process.exit(1);
   });
 
@@ -266,7 +406,7 @@ async function main(): Promise<void> {
 
   const shutdown = (): void => {
     server.close();
-    forgeProcess.kill();
+    forgeProcess?.kill();
     process.exit(0);
   };
   process.on('SIGINT', shutdown);

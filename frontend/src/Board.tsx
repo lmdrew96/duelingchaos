@@ -706,6 +706,10 @@ export default function Board({ onExit }: { onExit: () => void }) {
   };
 
   const pollHandle = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Guards the match-result report to fire exactly once per mount (a fresh
+  // Board mount — i.e. a new match — gets its own ref via useRef's initial
+  // value, so this doesn't need manual resetting).
+  const reportedRef = useRef(false);
 
   const load = () => {
     api
@@ -719,6 +723,12 @@ export default function Board({ onExit }: { onExit: () => void }) {
         if (s.gameOver && pollHandle.current != null) {
           clearInterval(pollHandle.current);
           pollHandle.current = null;
+        }
+        if (s.gameOver && !reportedRef.current) {
+          reportedRef.current = true;
+          const human = s.players.find((p) => !p.isAI) ?? s.players[0];
+          const won = !s.isDraw && s.winnerName != null && human != null && s.winnerName === human.name;
+          api.reportMatchResult(won, s.isDraw);
         }
         // A board refresh can unmount the tile currently under the cursor
         // (e.g. a card changing zones) without ever firing onMouseLeave —

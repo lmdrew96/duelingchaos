@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth, SignInButton } from '@clerk/react';
 import * as api from './api';
-import type { DecksList } from './types';
+import type { DecksList, MatchStats } from './types';
 import { DecoCorners } from './DecoCorner';
 import { DecoRule } from './DecoRule';
 import './Deckbuilder.css';
@@ -69,14 +69,34 @@ function Dashboard({
   onNavigate: (view: View) => void;
 }) {
   const [decksList, setDecksList] = useState<DecksList>({ presets: [], saved: [] });
+  const [matchStats, setMatchStats] = useState<MatchStats>({ wins: 0, losses: 0, draws: 0, recent: [] });
+  const [startingDeck, setStartingDeck] = useState<string | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
 
   useEffect(() => {
     getToken()
       .then((token) => api.listDecks(token))
       .then(setDecksList)
       .catch(() => undefined);
+    getToken()
+      .then((token) => api.getMatchStats(token))
+      .then(setMatchStats)
+      .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const playDeck = (name: string) => {
+    setStartingDeck(name);
+    setStartError(null);
+    getToken()
+      .then((token) => api.startMatch(name, token))
+      .then(() => onNavigate('board'))
+      .catch(() => setStartError('Could not start a match with that deck.'))
+      .finally(() => setStartingDeck(null));
+  };
+
+  const totalGames = matchStats.wins + matchStats.losses + matchStats.draws;
+  const winRate = totalGames > 0 ? Math.round((matchStats.wins / totalGames) * 100) : null;
 
   return (
     <div className="app-shell">
@@ -97,10 +117,16 @@ function Dashboard({
           ) : (
             <ul className="dashboard-deck-list">
               {decksList.saved.map((name) => (
-                <li key={name}>{name}</li>
+                <li key={name}>
+                  <span>{name}</span>
+                  <button disabled={startingDeck !== null} onClick={() => playDeck(name)}>
+                    {startingDeck === name ? 'Starting…' : 'Play'}
+                  </button>
+                </li>
               ))}
             </ul>
           )}
+          {startError && <p className="empty-hint">{startError}</p>}
           <button onClick={() => onNavigate('deckbuilder')}>Go to deckbuilder</button>
         </section>
 
@@ -120,9 +146,25 @@ function Dashboard({
         <section className="panel">
           <DecoCorners />
           <h2>Match history</h2>
-          <p className="empty-hint">
-            Coming soon — win/loss tracking needs a way to launch a match from a saved deck first.
-          </p>
+          {totalGames === 0 ? (
+            <p className="empty-hint">No matches played yet — play a saved deck to start tracking results.</p>
+          ) : (
+            <>
+              <p className="dashboard-stat-line">
+                <span className="dashboard-stat-number">{winRate}%</span> win rate ({matchStats.wins}-
+                {matchStats.losses}
+                {matchStats.draws > 0 ? `-${matchStats.draws}` : ''})
+              </p>
+              <ul className="dashboard-deck-list">
+                {matchStats.recent.map((entry, i) => (
+                  <li key={i}>
+                    <span>{entry.deckName}</span>
+                    <span>{entry.isDraw ? 'Draw' : entry.won ? 'Win' : 'Loss'}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <button className="ghost" onClick={() => onNavigate('board')}>
             Go to board
           </button>

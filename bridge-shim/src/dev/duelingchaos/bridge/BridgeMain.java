@@ -4,7 +4,10 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 import forge.GuiDesktop;
+import forge.deck.CardPool;
 import forge.deck.Deck;
+import forge.deck.DeckFormat;
+import forge.deck.DeckSection;
 import forge.deck.io.DeckSerializer;
 import forge.game.Game;
 import forge.game.GameRules;
@@ -27,6 +30,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -52,8 +57,8 @@ public class BridgeMain {
         GuiBase.setInterface(new GuiDesktop());
         FModel.initialize(null, null);
 
-        Deck humanDeck = DeckSerializer.fromFile(new File(args[0]));
-        Deck aiDeck = DeckSerializer.fromFile(new File(args[1]));
+        Deck humanDeck = loadDeck(args[0]);
+        Deck aiDeck = loadDeck(args[1]);
         if (humanDeck == null || aiDeck == null) {
             System.err.println("Failed to load one or both deck files");
             System.exit(1);
@@ -124,6 +129,29 @@ public class BridgeMain {
         }, "forge-game-thread");
         gameThread.setDaemon(true);
         gameThread.start();
+    }
+
+    // A ".decklist.txt" path is a plain "N Card Name" per line file (the
+    // same format the deckbuilder round-trips saved decks through, see
+    // DeckboxHandlers.parseDecklist) — the web app writes one of these for
+    // a Neon-saved deck instead of a full Forge .dck file, since it has no
+    // Forge classes available to serialize one. Anything else is a real
+    // .dck path, handled the normal way.
+    private static Deck loadDeck(String path) throws IOException {
+        if (!path.endsWith(".decklist.txt")) {
+            return DeckSerializer.fromFile(new File(path));
+        }
+        List<String> lines = new ArrayList<>();
+        for (String rawLine : Files.readAllLines(Paths.get(path))) {
+            String line = rawLine.trim();
+            if (!line.isEmpty()) lines.add(line);
+        }
+        CardPool pool = CardPool.fromCardList(lines);
+        if (pool.countAll() == 0) return null;
+        Deck deck = new Deck("Saved Deck");
+        deck.putSection(DeckSection.Main, pool);
+        deck.setDeckFormat(DeckFormat.Constructed);
+        return deck;
     }
 
     private static void handleState(HttpExchange exchange) throws IOException {
