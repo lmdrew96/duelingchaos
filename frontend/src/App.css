@@ -15,8 +15,31 @@
   color: var(--bg);
 }
 
-.auth-header {
+.header-actions {
   margin-left: auto;
   display: flex;
   align-items: center;
+  gap: 12px;
+}
+
+.auth-header {
+  display: flex;
+  align-items: center;
+}
+
+.theme-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.theme-toggle button {
+  padding: 5px 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-toggle button.active {
+  background: var(--gold);
+  color: var(--bg);
 }

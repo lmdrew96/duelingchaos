@@ -28,6 +28,25 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Light mode — same deco palette logic (parchment ground, bronze-gold
+   accent, deep-teal ink) inverted for a bright surface. src/theme.ts stamps
+   data-theme on <html> before first paint (see index.html's inline script)
+   so this never has to race a flash of the wrong theme in. */
+:root[data-theme='light'] {
+  --bg: #f6f1e2;
+  --bg-panel: #ede3c9;
+  --gold: #96700d;
+  --blue-deep: #d7e6e4;
+  --blue-mid: #7a9aa3;
+  --blue-muted: #5c7a85;
+  --text: #1c2f33;
+  --text-muted: #4d6b74;
+  --danger: #a8442e;
+  --ok: #3f7d3f;
+
+  color-scheme: light;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -48,6 +67,17 @@ body {
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Ccircle cx='20' cy='40' r='1.4' fill='%23c9527a' opacity='0.35'/%3E%3Ccircle cx='150' cy='20' r='1' fill='%23c9527a' opacity='0.25'/%3E%3Ccircle cx='90' cy='110' r='1.6' fill='%23c9527a' opacity='0.3'/%3E%3Ccircle cx='200' cy='160' r='1' fill='%23c9527a' opacity='0.2'/%3E%3Ccircle cx='40' cy='190' r='1.2' fill='%23c9527a' opacity='0.28'/%3E%3Ccircle cx='170' cy='210' r='1' fill='%23c9527a' opacity='0.22'/%3E%3Ccircle cx='110' cy='10' r='1' fill='%23c9527a' opacity='0.18'/%3E%3C/svg%3E");
   background-repeat: no-repeat, no-repeat, no-repeat, repeat;
   background-attachment: fixed, fixed, fixed, scroll;
+}
+
+/* Dark mode's glow opacities read as a smudge on a bright parchment ground —
+   same bloom/fleck layout, recolored to bronze-gold/rust at much lower
+   opacity so it stays a subtle atmosphere instead of a stain. */
+:root[data-theme='light'] body {
+  background-image:
+    radial-gradient(ellipse 70% 55% at 50% 0%, rgba(150, 112, 13, 0.12), transparent 70%),
+    radial-gradient(circle 380px at 6% 25%, rgba(168, 68, 46, 0.08), transparent 70%),
+    radial-gradient(circle 380px at 96% 75%, rgba(168, 68, 46, 0.07), transparent 70%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Ccircle cx='20' cy='40' r='1.4' fill='%23a8442e' opacity='0.22'/%3E%3Ccircle cx='150' cy='20' r='1' fill='%23a8442e' opacity='0.16'/%3E%3Ccircle cx='90' cy='110' r='1.6' fill='%23a8442e' opacity='0.2'/%3E%3Ccircle cx='200' cy='160' r='1' fill='%23a8442e' opacity='0.14'/%3E%3Ccircle cx='40' cy='190' r='1.2' fill='%23a8442e' opacity='0.18'/%3E%3Ccircle cx='170' cy='210' r='1' fill='%23a8442e' opacity='0.15'/%3E%3Ccircle cx='110' cy='10' r='1' fill='%23a8442e' opacity='0.12'/%3E%3C/svg%3E");
 }
 
 h1,
