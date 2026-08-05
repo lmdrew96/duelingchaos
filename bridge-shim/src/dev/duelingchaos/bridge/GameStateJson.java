@@ -20,6 +20,7 @@ public final class GameStateJson {
         field(sb, "playerTurn", game.getPlayerTurn() == null ? null : game.getPlayerTurn().getLobbyPlayerName()); sb.append(',');
         field(sb, "gameOver", game.isGameOver()); sb.append(',');
         sb.append("\"pendingPrompt\":"); writePendingPrompt(sb, gui); sb.append(',');
+        sb.append("\"pendingChoice\":"); writePendingChoice(sb, gui); sb.append(',');
 
         sb.append("\"players\":[");
         boolean first = true;
@@ -50,6 +51,39 @@ public final class GameStateJson {
         field(sb, "button2", gui == null ? null : gui.getButton2Label()); sb.append(',');
         field(sb, "button1Enabled", gui != null && gui.isButton1Enabled()); sb.append(',');
         field(sb, "button2Enabled", gui != null && gui.isButton2Enabled());
+        sb.append('}');
+    }
+
+    private static void writePendingChoice(StringBuilder sb, BridgeGuiGame gui) {
+        BridgeGuiGame.PendingChoice c = gui == null ? null : gui.getPendingChoice();
+        if (c == null) {
+            sb.append("null");
+            return;
+        }
+        sb.append('{');
+        field(sb, "kind", c.kind); sb.append(',');
+        field(sb, "title", c.title); sb.append(',');
+        sb.append("\"options\":");
+        if (c.options == null) {
+            sb.append("null");
+        } else {
+            sb.append('[');
+            boolean first = true;
+            for (String opt : c.options) {
+                if (!first) sb.append(',');
+                first = false;
+                sb.append('"').append(escape(opt)).append('"');
+            }
+            sb.append(']');
+        }
+        sb.append(',');
+        field(sb, "min", c.min); sb.append(',');
+        field(sb, "max", c.max); sb.append(',');
+        field(sb, "optional", c.optional); sb.append(',');
+        field(sb, "isNumeric", c.isNumeric); sb.append(',');
+        field(sb, "initialInput", c.initialInput); sb.append(',');
+        field(sb, "attacker", c.attacker); sb.append(',');
+        field(sb, "damage", c.damage);
         sb.append('}');
     }
 

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as api from './api';
-import type { BoardCard, GameState, PlayerState } from './types';
+import type { BoardCard, GameState, PendingChoice, PlayerState } from './types';
 import './Board.css';
 
 const POLL_INTERVAL_MS = 1000;
@@ -74,6 +74,124 @@ function PlayerZone({
   );
 }
 
+// One panel shape for every pendingChoice kind — they all reduce to
+// "pick indices from options" (list/target/targets), "pick a number"
+// (number), or "split a number across options" (combatDamage). Mirrors
+// the shared PendingChoice plumbing on the bridge side.
+function ChoicePanel({
+  choice,
+  onResolve,
+}: {
+  choice: PendingChoice;
+  onResolve: (values: number[]) => void;
+}) {
+  const options = choice.options ?? [];
+  const [selected, setSelected] = useState<number[]>([]);
+  const [numberValue, setNumberValue] = useState(choice.initialInput ?? '0');
+  const [amounts, setAmounts] = useState<number[]>(() => options.map(() => 0));
+
+  useEffect(() => {
+    setSelected([]);
+    setNumberValue(choice.initialInput ?? '0');
+    setAmounts(options.map(() => 0));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [choice.kind, choice.title, options.join('|')]);
+
+  if (choice.kind === 'number') {
+    const value = Number(numberValue);
+    const valid = Number.isInteger(value) && value >= 0;
+    return (
+      <div className="choice-panel">
+        <p className="choice-title">{choice.title}</p>
+        <div className="choice-number-row">
+          <input type="number" min={0} value={numberValue} onChange={(e) => setNumberValue(e.target.value)} />
+          <button disabled={!valid} onClick={() => onResolve([value])}>
+            Confirm
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (choice.kind === 'combatDamage') {
+    const total = amounts.reduce((a, b) => a + b, 0);
+    const valid = total === choice.damage;
+    const setAmount = (i: number, v: number) => setAmounts((prev) => prev.map((a, idx) => (idx === i ? v : a)));
+    return (
+      <div className="choice-panel">
+        <p className="choice-title">
+          {choice.attacker} assigns {choice.damage} damage
+        </p>
+        <div className="choice-damage-rows">
+          {options.map((label, i) => (
+            <div className="choice-damage-row" key={i}>
+              <span>{label}</span>
+              <input
+                type="number"
+                min={0}
+                max={choice.damage}
+                value={amounts[i] ?? 0}
+                onChange={(e) => setAmount(i, Math.max(0, Number(e.target.value)))}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="choice-footer">
+          <span className={`choice-total${valid ? ' valid' : ''}`}>
+            {total} / {choice.damage} assigned
+          </span>
+          <button disabled={!valid} onClick={() => onResolve(amounts)}>
+            Confirm
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // list | target | targets
+  const isSingle = choice.kind === 'target';
+  const max = isSingle ? 1 : choice.max || options.length;
+  const valid = selected.length >= choice.min && selected.length <= max;
+  const toggle = (i: number) => {
+    if (isSingle) {
+      setSelected([i]);
+      return;
+    }
+    setSelected((prev) => {
+      if (prev.includes(i)) return prev.filter((x) => x !== i);
+      if (prev.length >= max) return prev;
+      return [...prev, i];
+    });
+  };
+
+  return (
+    <div className="choice-panel">
+      <p className="choice-title">{choice.title}</p>
+      <div className="choice-options">
+        {options.map((label, i) => (
+          <button
+            key={i}
+            className={`choice-option${selected.includes(i) ? ' selected' : ''}`}
+            onClick={() => toggle(i)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="choice-footer">
+        <button disabled={!valid} onClick={() => onResolve(selected)}>
+          Confirm
+        </button>
+        {choice.optional && (
+          <button className="ghost" onClick={() => onResolve([])}>
+            Skip
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Board() {
   const [state, setState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +243,18 @@ export default function Board() {
   const human = state.players.find((p) => !p.isAI) ?? state.players[0];
   const opponent = state.players.find((p) => p.isAI) ?? state.players[1];
   const prompt = state.pendingPrompt;
+  const choice = state.pendingChoice;
+
+  const resolveChoice = (values: number[]) => {
+    if (!choice) return;
+    if (choice.kind === 'number') {
+      runAction(() => api.selectNumber(values[0] ?? 0));
+    } else if (choice.kind === 'combatDamage') {
+      runAction(() => api.assignDamage(values));
+    } else {
+      runAction(() => api.selectChoice(values));
+    }
+  };
 
   return (
     <div className="board-shell">
@@ -158,7 +288,9 @@ export default function Board() {
         />
       )}
 
-      {prompt?.message && (
+      {choice && <ChoicePanel choice={choice} onResolve={resolveChoice} />}
+
+      {!choice && prompt?.message && (
         <div className="prompt-panel">
           <p className="prompt-message">{prompt.message}</p>
           <div className="prompt-buttons">

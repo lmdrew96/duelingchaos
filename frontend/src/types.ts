@@ -46,12 +46,28 @@ export type PendingPrompt = {
   button2Enabled: boolean;
 };
 
+export type PendingChoiceKind = 'list' | 'target' | 'targets' | 'number' | 'combatDamage';
+
+export type PendingChoice = {
+  kind: PendingChoiceKind;
+  title: string | null;
+  options: string[] | null;
+  min: number;
+  max: number;
+  optional: boolean;
+  isNumeric: boolean;
+  initialInput: string | null;
+  attacker: string | null;
+  damage: number;
+};
+
 export type GameState = {
   turn: number;
   phase: string;
   playerTurn: string | null;
   gameOver: boolean;
   pendingPrompt: PendingPrompt;
+  pendingChoice: PendingChoice | null;
   players: PlayerState[];
   stack: string[];
 };

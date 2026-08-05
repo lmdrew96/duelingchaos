@@ -25,6 +25,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.TimeUnit;
 
 // AbstractGuiGame (the same base Forge's own desktop/mobile GUIs extend)
 // already implements most of IGuiGame's plumbing — state tracking, zone
@@ -55,6 +57,113 @@ public class BridgeGuiGame extends AbstractGuiGame {
     public String getButton2Label() { return button2Label; }
     public boolean isButton1Enabled() { return button1Enabled; }
     public boolean isButton2Enabled() { return button2Enabled; }
+
+    // Generic "block the forge-game-thread and ask the human" mechanism.
+    // Every real-choice callback (targeting, modal spells, mana payment,
+    // X-cost, combat damage) shares this one shape: stash a description of
+    // the choice where GameStateJson can see it, then rendezvous on
+    // choiceAnswer until an HTTP action resolves it. Forge calls these
+    // synchronously from its own dedicated game thread (see BridgeMain),
+    // so blocking here doesn't touch the HTTP dispatch thread.
+    public static final class PendingChoice {
+        public final String kind;
+        public final String title;
+        public final List<String> options;
+        public final int min;
+        public final int max;
+        public final boolean optional;
+        public final boolean isNumeric;
+        public final String initialInput;
+        public final String attacker;
+        public final int damage;
+
+        private PendingChoice(String kind, String title, List<String> options, int min, int max,
+                boolean optional, boolean isNumeric, String initialInput, String attacker, int damage) {
+            this.kind = kind;
+            this.title = title;
+            this.options = options;
+            this.min = min;
+            this.max = max;
+            this.optional = optional;
+            this.isNumeric = isNumeric;
+            this.initialInput = initialInput;
+            this.attacker = attacker;
+            this.damage = damage;
+        }
+
+        static PendingChoice list(String title, List<String> options, int min, int max) {
+            return new PendingChoice("list", title, options, min, max, false, false, null, null, 0);
+        }
+
+        static PendingChoice target(String title, List<String> options, boolean optional) {
+            return new PendingChoice("target", title, options, optional ? 0 : 1, 1, optional, false, null, null, 0);
+        }
+
+        static PendingChoice targets(String title, List<String> options, int min, int max) {
+            return new PendingChoice("targets", title, options, min, max, min == 0, false, null, null, 0);
+        }
+
+        static PendingChoice number(String title, String initialInput) {
+            return new PendingChoice("number", title, null, 0, 0, false, true, initialInput, null, 0);
+        }
+
+        static PendingChoice combatDamage(String attacker, List<String> blockerLabels, int damage) {
+            return new PendingChoice("combatDamage", "Assign combat damage", blockerLabels, 0, 0, false, false, null, attacker, damage);
+        }
+    }
+
+    private volatile PendingChoice pendingChoice;
+    private final SynchronousQueue<String> choiceAnswer = new SynchronousQueue<>();
+
+    public PendingChoice getPendingChoice() { return pendingChoice; }
+
+    // Called from the HTTP dispatch thread. Bounded wait rather than put()
+    // so a stale/mistimed resolve request can never hang the single-threaded
+    // HTTP server (see BridgeMain — setExecutor(null) means one request at a
+    // time for the whole bridge, /state included).
+    public boolean resolveChoice(String answer) {
+        if (pendingChoice == null) return false;
+        try {
+            return choiceAnswer.offer(answer, 5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
+    private String awaitChoiceAnswer() {
+        try {
+            return choiceAnswer.take();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "";
+        }
+    }
+
+    private static List<Integer> parseIndices(String answer) {
+        List<Integer> result = new ArrayList<>();
+        for (String part : answer.split(",")) {
+            String trimmed = part.trim();
+            if (trimmed.isEmpty()) continue;
+            try {
+                result.add(Integer.parseInt(trimmed));
+            } catch (NumberFormatException ignored) {
+                // malformed index — skip rather than crash the game thread
+            }
+        }
+        return result;
+    }
+
+    private static String entityLabel(GameEntityView e) {
+        if (e instanceof CardView) {
+            CardView c = (CardView) e;
+            return c.getCurrentState().getName() + (c.isTapped() ? " (tapped)" : "");
+        }
+        if (e instanceof PlayerView) {
+            return ((PlayerView) e).getLobbyPlayerName();
+        }
+        return String.valueOf(e);
+    }
 
     @Override
     protected void updateCurrentPlayer(PlayerView player) {
@@ -169,15 +278,41 @@ public class BridgeGuiGame extends AbstractGuiGame {
         if (optionList.isEmpty()) {
             return null;
         }
-        return optionList.get(0);
+        if (optionList.size() == 1 && !isOptional) {
+            return optionList.get(0);
+        }
+        List<String> labels = new ArrayList<>();
+        for (GameEntityView e : optionList) labels.add(entityLabel(e));
+        pendingChoice = PendingChoice.target(title, labels, isOptional);
+        String answer = awaitChoiceAnswer();
+        pendingChoice = null;
+        List<Integer> indices = parseIndices(answer);
+        if (indices.isEmpty()) {
+            return isOptional ? null : optionList.get(0);
+        }
+        int idx = indices.get(0);
+        return (idx >= 0 && idx < optionList.size()) ? optionList.get(idx) : optionList.get(0);
     }
 
     @Override
     public List<GameEntityView> chooseEntitiesForEffect(String title, List<? extends GameEntityView> optionList, int min, int max, DelayedReveal delayedReveal) {
-        int count = Math.max(min, 0);
+        if (optionList.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<String> labels = new ArrayList<>();
+        for (GameEntityView e : optionList) labels.add(entityLabel(e));
+        pendingChoice = PendingChoice.targets(title, labels, min, max);
+        String answer = awaitChoiceAnswer();
+        pendingChoice = null;
         List<GameEntityView> result = new ArrayList<>();
-        for (int i = 0; i < count && i < optionList.size(); i++) {
-            result.add(optionList.get(i));
+        for (int idx : parseIndices(answer)) {
+            if (idx >= 0 && idx < optionList.size()) result.add(optionList.get(idx));
+        }
+        if (result.size() < Math.max(min, 0)) {
+            // fall back to the old deterministic default rather than hand
+            // Forge a choice that violates its own min-count contract
+            result.clear();
+            for (int i = 0; i < min && i < optionList.size(); i++) result.add(optionList.get(i));
         }
         return result;
     }

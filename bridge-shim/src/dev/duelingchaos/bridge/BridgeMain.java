@@ -104,6 +104,7 @@ public class BridgeMain {
         server.createContext("/action/tap-land", BridgeMain::handleTapLand);
         server.createContext("/action/select-ok", exchange -> handleButton(exchange, true));
         server.createContext("/action/select-cancel", exchange -> handleButton(exchange, false));
+        server.createContext("/action/select-choice", BridgeMain::handleSelectChoice);
         DeckboxHandlers.register(server, decksDir);
         server.setExecutor(null);
         server.start();
@@ -158,6 +159,29 @@ public class BridgeMain {
     // battlefield instead of the hand — that's what a pending mana-cost
     // prompt (InputPayMana) is waiting on.
     private static final Pattern INDEX_FIELD = Pattern.compile("\"index\"\\s*:\\s*(\\d+)");
+    private static final Pattern INDICES_FIELD = Pattern.compile("\"indices\"\\s*:\\s*\\[([^\\]]*)\\]");
+
+    // Resolves any pending BridgeGuiGame.PendingChoice of kind "list",
+    // "target", or "targets" — all three are answered the same way, by
+    // index into the options array the frontend was shown.
+    private static void handleSelectChoice(HttpExchange exchange) throws IOException {
+        if (!"POST".equals(exchange.getRequestMethod())) {
+            respond(exchange, 405, "{\"error\":\"POST only\"}");
+            return;
+        }
+        String body;
+        try (InputStream is = exchange.getRequestBody()) {
+            body = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        Matcher m = INDICES_FIELD.matcher(body);
+        if (!m.find()) {
+            respond(exchange, 400, "{\"error\":\"expected JSON body {\\\"indices\\\": [N, ...]}\"}");
+            return;
+        }
+        String answer = m.group(1).replaceAll("\\s+", "");
+        boolean ok = gui != null && gui.resolveChoice(answer);
+        respond(exchange, 200, "{\"ok\":" + ok + "}");
+    }
 
     private static void handlePlayCard(HttpExchange exchange) throws IOException {
         handleSelectFromZone(exchange, ZoneType.Hand);

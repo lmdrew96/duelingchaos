@@ -72,3 +72,11 @@ export const selectCancel = (): Promise<void> => postAction('select-cancel');
 // discard) — InputProxy figures out what the click means server-side.
 export const playCard = (index: number): Promise<void> => postAction('play-card', { index });
 export const tapLand = (index: number): Promise<void> => postAction('tap-land', { index });
+
+// Resolves any pendingChoice of kind "list" | "target" | "targets" — all
+// three are answered the same way, by index into pendingChoice.options.
+export const selectChoice = (indices: number[]): Promise<void> =>
+  postAction('select-choice', { indices });
+export const selectNumber = (value: number): Promise<void> => postAction('select-number', { value });
+export const assignDamage = (amounts: number[]): Promise<void> =>
+  postAction('assign-damage', { amounts });
