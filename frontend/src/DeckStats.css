@@ -27,10 +27,14 @@
 }
 
 /* % based (not px) so the point stays proportional even on a near-zero-height
-   bar — matches the "8 Progress Bars" reference's faceted, not rounded, caps. */
+   bar — matches the "8 Progress Bars" reference's faceted, not rounded, caps.
+   margin-top: auto pushes the bar to the bottom of .curve-col (flush against
+   .curve-label) so it rises up from the baseline instead of hanging down
+   from the count at the top. */
 .curve-bar {
   width: 100%;
   min-height: 2px;
+  margin-top: auto;
   background: var(--gold);
   clip-path: polygon(0 8%, 50% 0, 100% 8%, 100% 100%, 0 100%);
 }
