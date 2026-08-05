@@ -2,7 +2,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 100svh;
+  height: 100svh;
+  overflow: hidden;
   padding: 16px 24px;
   gap: 12px;
 }
@@ -115,6 +116,9 @@
 .board-zone {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   gap: 10px;
 }
 
@@ -207,6 +211,9 @@
 .battlefield-groups {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   gap: 8px;
 }
 
@@ -697,6 +704,8 @@
   justify-content: center;
   gap: 8px;
   margin-bottom: 12px;
+  max-height: 40vh;
+  overflow-y: auto;
 }
 
 .choice-option {
