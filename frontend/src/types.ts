@@ -3,6 +3,10 @@ export type CardInfo = {
   manaCost: string;
   type: string;
   colors: string;
+  // Commander legality's actual axis — mana symbols anywhere on the card
+  // (including ability text and hybrid costs), not just its own color. See
+  // Deckbuilder's commander color-identity filtering.
+  colorIdentity: string;
   power: string | null;
   toughness: string | null;
   oracleText: string;

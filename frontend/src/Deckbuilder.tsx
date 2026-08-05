@@ -162,6 +162,15 @@ function DeckbuilderCore({
   const mainCards = deckCards.filter((c) => !c.section);
   const sideboardCards = deckCards.filter((c) => c.section === 'sideboard');
 
+  // Commander color identity — every card's identity must be a subset of
+  // this once a commander is set, per the format rule (not just its cast
+  // cost color; identity includes ability-text/hybrid mana symbols, see
+  // CardInfo.colorIdentity). Null (no commander) means no restriction.
+  const commanderIdentity = commanderCard ? cardInfoCache[commanderCard.name]?.colorIdentity ?? null : null;
+  const withinCommanderIdentity = (colorIdentity: string) =>
+    commanderIdentity == null || [...colorIdentity].every((c) => commanderIdentity.includes(c));
+  const visibleSearchResults = searchResults.filter((c) => withinCommanderIdentity(c.colorIdentity));
+
   const manaCurve = useMemo(() => {
     const buckets = new Array(CURVE_BUCKETS).fill(0);
     for (const dc of deckCards) {
@@ -191,6 +200,11 @@ function DeckbuilderCore({
   }, [deckCards, cardInfoCache]);
 
   const addCard = (name: string, info?: CardInfo) => {
+    // Defensive re-check against a stale/not-yet-loaded commanderIdentity —
+    // the search list itself is already filtered (see visibleSearchResults),
+    // this just covers the brief window before the commander's own
+    // colorIdentity has resolved into cardInfoCache.
+    if (info && !withinCommanderIdentity(info.colorIdentity)) return;
     if (info) setCardInfoCache((prev) => ({ ...prev, [name]: info }));
     setDeckCards((prev) => {
       const existing = prev.find((c) => c.name === name);
@@ -332,8 +346,14 @@ function DeckbuilderCore({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+          {commanderCard && (
+            <p className="empty-hint">
+              Filtered to {commanderCard.name}'s color identity
+              {commanderIdentity ? ` (${commanderIdentity})` : ' (colorless)'}.
+            </p>
+          )}
           <div className="card-list">
-            {searchResults.map((card) => (
+            {visibleSearchResults.map((card) => (
               <div
                 className="card-row"
                 key={card.name}
@@ -363,6 +383,9 @@ function DeckbuilderCore({
             )}
             {searchResults.length === 0 && searchQuery.trim() === '' && (
               <p className="empty-hint">Type a card name or search syntax to begin.</p>
+            )}
+            {searchResults.length > 0 && visibleSearchResults.length === 0 && (
+              <p className="empty-hint">No matches fit {commanderCard!.name}'s color identity.</p>
             )}
             {searchTruncated && (
               <p className="empty-hint">Showing first {searchResults.length} matches — refine your search to see more.</p>

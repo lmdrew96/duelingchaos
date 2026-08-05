@@ -43,6 +43,12 @@ public final class CardDbJson {
         field(sb, "manaCost", r.getManaCost() == null ? "" : r.getManaCost().toString()); sb.append(',');
         field(sb, "type", String.valueOf(r.getType())); sb.append(',');
         field(sb, "colors", r.getColor() == null ? "" : r.getColor().toString()); sb.append(',');
+        // Color identity (commander legality's actual axis — includes mana
+        // symbols in ability text and hybrid costs, not just the card's own
+        // color) rather than getColor() again, so the frontend can filter
+        // search/adds against a set commander without duplicating Forge's
+        // own identity computation.
+        field(sb, "colorIdentity", r.getColorIdentity() == null ? "" : r.getColorIdentity().toString()); sb.append(',');
         field(sb, "power", r.getPower()); sb.append(',');
         field(sb, "toughness", r.getToughness()); sb.append(',');
         field(sb, "oracleText", r.getOracleText());
