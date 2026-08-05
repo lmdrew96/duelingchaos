@@ -5,6 +5,23 @@ import './Board.css';
 
 const POLL_INTERVAL_MS = 1000;
 
+// Mana-payment ambiguity (which color/source to tap) resolves through the
+// same getChoices path as modal spell modes — Forge has no dedicated
+// mana-choice hook. When every option in a "list" choice is a recognized
+// color name, render WUBRG pips instead of generic text buttons.
+const MANA_PIP_CLASS: Record<string, string> = {
+  white: 'pip-w',
+  blue: 'pip-u',
+  black: 'pip-b',
+  red: 'pip-r',
+  green: 'pip-g',
+  colorless: 'pip-c',
+};
+
+function manaPipClass(label: string): string | null {
+  return MANA_PIP_CLASS[label.trim().toLowerCase()] ?? null;
+}
+
 function CardTile({ card, index, onClick }: { card: BoardCard; index: number; onClick?: (index: number) => void }) {
   const showPT = card.power !== 0 || card.toughness !== 0;
   return (
@@ -163,20 +180,29 @@ function ChoicePanel({
       return [...prev, i];
     });
   };
+  const allPips = choice.kind === 'list' && options.length > 0 && options.every((o) => manaPipClass(o));
 
   return (
     <div className="choice-panel">
       <p className="choice-title">{choice.title}</p>
-      <div className="choice-options">
-        {options.map((label, i) => (
-          <button
-            key={i}
-            className={`choice-option${selected.includes(i) ? ' selected' : ''}`}
-            onClick={() => toggle(i)}
-          >
-            {label}
-          </button>
-        ))}
+      <div className={allPips ? 'choice-pips' : 'choice-options'}>
+        {options.map((label, i) => {
+          const pipClass = allPips ? manaPipClass(label) : null;
+          return (
+            <button
+              key={i}
+              className={
+                pipClass
+                  ? `choice-pip ${pipClass}${selected.includes(i) ? ' selected' : ''}`
+                  : `choice-option${selected.includes(i) ? ' selected' : ''}`
+              }
+              title={label}
+              onClick={() => toggle(i)}
+            >
+              {pipClass ? '' : label}
+            </button>
+          );
+        })}
       </div>
       <div className="choice-footer">
         <button disabled={!valid} onClick={() => onResolve(selected)}>

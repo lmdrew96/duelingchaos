@@ -231,6 +231,34 @@
   color: var(--bg);
 }
 
+.choice-pips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.choice-pip {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  padding: 0;
+  border: 2px solid transparent;
+}
+
+.choice-pip.selected {
+  border-color: var(--gold);
+  transform: scale(1.1);
+}
+
+.choice-pip.pip-w { background: #f8f6d8; }
+.choice-pip.pip-u { background: #0e68ab; }
+.choice-pip.pip-b { background: #150b00; }
+.choice-pip.pip-r { background: #d3202a; }
+.choice-pip.pip-g { background: #00733e; }
+.choice-pip.pip-c { background: #bdbdbd; }
+
 .choice-footer {
   display: flex;
   justify-content: center;
