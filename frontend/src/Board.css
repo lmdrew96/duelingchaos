@@ -1,0 +1,164 @@
+.board-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  padding: 16px 24px;
+  gap: 12px;
+}
+
+.board-hud {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.board-hud .refresh-btn {
+  border-color: var(--blue-muted);
+  color: var(--text-muted);
+  padding: 4px 14px;
+  font-size: 0.75rem;
+}
+
+.board-error {
+  text-align: center;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.board-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.board-zone.opponent-zone {
+  flex-direction: column-reverse;
+}
+
+.player-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.player-name {
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.life-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+
+.life-badge .life-value {
+  transform: rotate(-45deg);
+  font-family: var(--mono);
+  font-size: 1rem;
+  color: var(--gold);
+}
+
+.life-badge.opponent {
+  border-color: var(--blue-muted);
+}
+
+.life-badge.opponent .life-value {
+  color: var(--text-muted);
+}
+
+.zone-counts {
+  display: flex;
+  gap: 12px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.card-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 84px;
+}
+
+.card-tile {
+  width: 92px;
+  height: 76px;
+  border: 1px solid var(--blue-mid);
+  border-radius: 8px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--bg-panel);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.card-tile.tapped {
+  transform: rotate(8deg);
+  opacity: 0.6;
+}
+
+.card-tile-name {
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: var(--text);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.card-tile-pt {
+  align-self: flex-end;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--gold);
+}
+
+.card-back {
+  width: 60px;
+  height: 76px;
+  border: 1px solid var(--blue-muted);
+  border-radius: 8px;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--bg-panel),
+    var(--bg-panel) 6px,
+    rgba(65, 96, 117, 0.25) 6px,
+    rgba(65, 96, 117, 0.25) 12px
+  );
+}
+
+.stack-strip {
+  align-self: center;
+  min-width: 240px;
+  border: 1px solid var(--blue-mid);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.stack-strip .stack-label {
+  color: var(--gold);
+  margin-right: 8px;
+}
+
+.board-divider {
+  border-top: 1px solid var(--blue-mid);
+  margin: 4px 0;
+}

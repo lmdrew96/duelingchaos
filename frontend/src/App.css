@@ -1,0 +1,16 @@
+.view-switcher {
+  display: flex;
+  gap: 8px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--blue-mid);
+}
+
+.view-switcher button {
+  padding: 4px 14px;
+  font-size: 0.8rem;
+}
+
+.view-switcher button.active {
+  background: var(--gold);
+  color: var(--bg);
+}

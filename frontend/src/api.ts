@@ -1,4 +1,4 @@
-import type { CardInfo, DeckCard, DeckSummary, DecksList, Legality } from './types';
+import type { CardInfo, DeckCard, DeckSummary, DecksList, GameState, Legality } from './types';
 
 const BASE = '/api';
 
@@ -47,5 +47,11 @@ export async function checkLegality(format: string, cards: DeckCard[]): Promise<
     headers: { 'Content-Type': 'text/plain' },
     body: toDecklistText(cards),
   });
+  return res.json();
+}
+
+export async function fetchGameState(): Promise<GameState> {
+  const res = await fetch(`${BASE}/game-state`);
+  if (!res.ok) throw new Error('failed to fetch game state');
   return res.json();
 }
