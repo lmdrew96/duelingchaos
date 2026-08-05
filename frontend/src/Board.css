@@ -162,6 +162,25 @@
   color: var(--text-muted);
 }
 
+.zone-count-btn {
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.zone-count-btn:hover:not(:disabled) {
+  background: transparent;
+  color: var(--gold);
+}
+
+.zone-count-btn:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
 .card-row {
   display: flex;
   flex-wrap: wrap;
@@ -208,7 +227,32 @@
   flex-direction: column;
   justify-content: space-between;
   background: var(--bg-panel);
+  overflow: hidden;
   transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.card-tile-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Darkens the bottom two-thirds so name/cost/P&T text stays legible over
+   the art crop underneath — not the top, since art crops are usually
+   busiest right where the tile's "i" button sits. */
+.card-tile-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(8, 38, 45, 0.15) 0%, rgba(8, 38, 45, 0.55) 45%, rgba(8, 38, 45, 0.88) 100%);
+}
+
+.card-tile-name,
+.card-tile-cost,
+.card-tile-pt,
+.card-tile-info {
+  position: relative;
+  z-index: 1;
 }
 
 .card-tile::before {
@@ -374,6 +418,78 @@
   color: var(--gold);
   text-align: right;
   margin: 12px 0 0;
+}
+
+/* Only offered where hover is a real pointer gesture — on touch, the
+   existing "i" button / CardDetailModal covers the same need. */
+.card-hover-preview {
+  position: fixed;
+  z-index: 30;
+  pointer-events: none;
+  border: 1px solid var(--gold);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+@media not all and (hover: hover) {
+  .card-hover-preview {
+    display: none;
+  }
+}
+
+.card-hover-preview-art {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+}
+
+.graveyard-panel {
+  width: min(560px, 92vw);
+}
+
+.graveyard-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.graveyard-card {
+  width: 92px;
+  padding: 0;
+  border: 1px solid var(--blue-mid);
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--text);
+}
+
+.graveyard-card:hover {
+  background: transparent;
+  border-color: var(--gold);
+}
+
+.graveyard-card-art {
+  width: 100%;
+  aspect-ratio: 5 / 4;
+}
+
+.graveyard-card-name {
+  font-size: 0.68rem;
+  padding: 4px 6px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card-detail-art {
+  width: 100%;
+  max-width: 260px;
+  aspect-ratio: 5 / 7;
+  border-radius: 6px;
+  margin: 0 auto 12px;
+  display: block;
 }
 
 .card-back {

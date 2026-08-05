@@ -33,9 +33,9 @@
 }
 
 .panel {
+  position: relative;
   background: var(--bg-panel);
   border: 1px solid var(--blue-mid);
-  border-radius: 12px;
   padding: 16px;
 }
 
@@ -66,12 +66,18 @@
   gap: 10px;
   padding: 8px;
   border: 1px solid transparent;
-  border-radius: 8px;
   cursor: pointer;
 }
 
 .card-row:hover {
   border-color: var(--gold);
+}
+
+.card-row-art {
+  width: 56px;
+  height: 42px;
+  flex-shrink: 0;
+  border: 1px solid var(--blue-mid);
 }
 
 .card-row-main {
@@ -117,6 +123,13 @@
   gap: 8px;
   padding: 4px 0;
   border-bottom: 1px solid rgba(65, 96, 117, 0.3);
+}
+
+.deck-row-art {
+  width: 32px;
+  height: 24px;
+  flex-shrink: 0;
+  border: 1px solid var(--blue-mid);
 }
 
 .deck-row-name {

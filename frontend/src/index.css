@@ -137,6 +137,17 @@ select:focus {
 .mana-pip-sm.pip-c { background: #bdbdbd; color: #08262d; }
 .mana-pip-sm.pip-generic { background: var(--blue-muted); color: var(--text); }
 
+/* Shared base for CardArt.tsx — live Scryfall art (see cardArt.ts). Layout
+   (size/position) is set per-surface by the className each caller passes. */
+.card-art {
+  display: block;
+  object-fit: cover;
+}
+
+.card-art-fallback {
+  background: var(--bg-panel);
+}
+
 .mana-pip-text {
   font-family: var(--mono);
   color: var(--gold);

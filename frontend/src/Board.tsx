@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as api from './api';
 import type { BoardCard, CardInfo, EntityRef, GameState, PendingChoice, PlayerState, PointerInfo, StackItem } from './types';
 import { ManaPips } from './manaCost';
+import { CardArt } from './CardArt';
+import { DecoCorner, DecoCorners } from './DecoCorner';
 import './Board.css';
 
 const POLL_INTERVAL_MS = 1000;
@@ -50,30 +52,6 @@ function LifeBadgeOrnament({ opponent }: { opponent?: boolean }) {
   );
 }
 
-// A small diamond-and-hairline corner ornament, reused (with CSS mirroring)
-// at all four corners of the singular chrome panels — prompts/choices are
-// one-off, so real linework earns its keep there without becoming noise.
-function DecoCorner({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) {
-  return (
-    <svg viewBox="0 0 20 20" className={`deco-corner ${position}`} aria-hidden>
-      <rect x="6" y="6" width="8" height="8" fill="var(--gold)" transform="rotate(45 10 10)" />
-      <line x1="10" y1="10" x2="20" y2="10" stroke="var(--gold)" strokeWidth="1.5" />
-      <line x1="10" y1="10" x2="10" y2="20" stroke="var(--gold)" strokeWidth="1.5" />
-    </svg>
-  );
-}
-
-function DecoCorners() {
-  return (
-    <>
-      <DecoCorner position="tl" />
-      <DecoCorner position="tr" />
-      <DecoCorner position="bl" />
-      <DecoCorner position="br" />
-    </>
-  );
-}
-
 function CardTile({
   card,
   index,
@@ -81,6 +59,8 @@ function CardTile({
   targetable,
   registerRef,
   onInfoClick,
+  onHoverStart,
+  onHoverEnd,
 }: {
   card: BoardCard;
   index: number;
@@ -88,6 +68,8 @@ function CardTile({
   targetable?: boolean;
   registerRef?: (el: HTMLElement | null) => void;
   onInfoClick?: (name: string) => void;
+  onHoverStart?: (name: string, el: HTMLElement) => void;
+  onHoverEnd?: () => void;
 }) {
   const showPT = card.power !== 0 || card.toughness !== 0;
   return (
@@ -95,7 +77,11 @@ function CardTile({
       ref={registerRef}
       className={`card-tile${card.tapped ? ' tapped' : ''}${onClick ? ' clickable' : ''}${targetable ? ' targetable' : ''}`}
       onClick={onClick ? () => onClick(index) : undefined}
+      onMouseEnter={onHoverStart ? (e) => onHoverStart(card.name, e.currentTarget) : undefined}
+      onMouseLeave={onHoverEnd}
     >
+      <CardArt name={card.name} variant="crop" className="card-tile-art" />
+      <div className="card-tile-scrim" />
       {onInfoClick && (
         <button
           type="button"
@@ -190,6 +176,9 @@ function PlayerZone({
   onEntityFallbackClick,
   registerElementRef,
   onInfoClick,
+  onHoverStart,
+  onHoverEnd,
+  onGraveyardClick,
 }: {
   player: PlayerState;
   faceDownHand: boolean;
@@ -203,6 +192,9 @@ function PlayerZone({
   onEntityFallbackClick?: (ref: EntityRef) => void;
   registerElementRef: (key: EntityRef, el: HTMLElement | null) => void;
   onInfoClick?: (name: string) => void;
+  onHoverStart?: (name: string, el: HTMLElement) => void;
+  onHoverEnd?: () => void;
+  onGraveyardClick?: () => void;
 }) {
   const playerRef: EntityRef = `player:${player.id}`;
   const playerTargetable = targetableRefs?.has(playerRef) ?? false;
@@ -226,7 +218,16 @@ function PlayerZone({
         <span className="player-name">{player.name}</span>
         <span className="zone-counts">
           <span>library {player.libraryCount}</span>
-          <span>graveyard {player.graveyard.length}</span>
+          {/* Graveyard is public info in real MTG (unlike the library), so
+              it's browsable — clicking opens the actual card list. */}
+          <button
+            type="button"
+            className="zone-count-btn"
+            disabled={player.graveyard.length === 0 || !onGraveyardClick}
+            onClick={onGraveyardClick}
+          >
+            graveyard {player.graveyard.length}
+          </button>
         </span>
       </div>
       {/* A single wrapping div, not one flex child per group — .opponent-zone
@@ -255,6 +256,8 @@ function PlayerZone({
                       targetable={targetable}
                       registerRef={(el) => registerElementRef(ref, el)}
                       onInfoClick={onInfoClick}
+                      onHoverStart={onHoverStart}
+                      onHoverEnd={onHoverEnd}
                       key={ref}
                     />
                   );
@@ -270,7 +273,15 @@ function PlayerZone({
           <CardBacks count={player.hand.length} />
         ) : (
           player.hand.map((c, i) => (
-            <CardTile card={c} index={i} onClick={onHandClick} onInfoClick={onInfoClick} key={`${c.name}-${i}`} />
+            <CardTile
+              card={c}
+              index={i}
+              onClick={onHandClick}
+              onInfoClick={onInfoClick}
+              onHoverStart={onHoverStart}
+              onHoverEnd={onHoverEnd}
+              key={`${c.name}-${i}`}
+            />
           ))
         )}
       </div>
@@ -454,6 +465,7 @@ function CardDetailModal({ cardName, onClose }: { cardName: string; onClose: () 
         {!loading && notFound && <p className="choice-hint">No card data found for "{cardName}".</p>}
         {!loading && detail && (
           <>
+            <CardArt name={detail.name} variant="full" className="card-detail-art" />
             <div className="card-detail-header">
               <span className="card-detail-name">{detail.name}</span>
               <ManaPips cost={detail.manaCost} size="md" />
@@ -468,6 +480,63 @@ function CardDetailModal({ cardName, onClose }: { cardName: string; onClose: () 
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// Desktop-hover companion to CardDetailModal's click-to-pin: floats the full
+// card face beside the hovered tile so you can read it without leaving your
+// place on the board. Positioned from the tile's own rect (not the cursor)
+// so it doesn't jitter as the mouse moves within the tile, and clamped to
+// the viewport since tiles near an edge would otherwise push it off-screen.
+function CardHoverPreview({ name, anchor }: { name: string; anchor: HTMLElement }) {
+  const rect = anchor.getBoundingClientRect();
+  const width = 240;
+  let left = rect.right + 12;
+  if (left + width > window.innerWidth - 12) left = rect.left - width - 12;
+  left = Math.max(12, left);
+  const top = Math.min(Math.max(12, rect.top), window.innerHeight - 340);
+
+  return (
+    <div className="card-hover-preview" style={{ top, left, width }}>
+      <CardArt name={name} variant="full" className="card-hover-preview-art" />
+    </div>
+  );
+}
+
+// Graveyards are public information in real MTG (unlike libraries), so this
+// browses the actual cards rather than just showing a count. Reuses
+// CardDetailModal for a selected card's full text instead of duplicating it.
+function GraveyardModal({
+  playerName,
+  cards,
+  onClose,
+}: {
+  playerName: string;
+  cards: BoardCard[];
+  onClose: () => void;
+}) {
+  const [detailCardName, setDetailCardName] = useState<string | null>(null);
+  return (
+    <div className="card-detail-backdrop" onClick={onClose}>
+      <div className="card-detail-panel graveyard-panel" onClick={(e) => e.stopPropagation()}>
+        <DecoCorners />
+        <button type="button" className="ghost card-detail-close" onClick={onClose}>
+          close
+        </button>
+        <p className="choice-title">
+          {playerName}'s graveyard — {cards.length}
+        </p>
+        <div className="graveyard-grid">
+          {cards.map((c, i) => (
+            <button type="button" className="graveyard-card" key={`${c.name}-${i}`} onClick={() => setDetailCardName(c.name)}>
+              <CardArt name={c.name} variant="crop" className="graveyard-card-art" />
+              <span className="graveyard-card-name">{c.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      {detailCardName && <CardDetailModal cardName={detailCardName} onClose={() => setDetailCardName(null)} />}
     </div>
   );
 }
@@ -520,6 +589,8 @@ export default function Board() {
   const [selected, setSelected] = useState<number[]>([]);
   const [arrows, setArrows] = useState<Arrow[]>([]);
   const [detailCardName, setDetailCardName] = useState<string | null>(null);
+  const [hoverCard, setHoverCard] = useState<{ name: string; el: HTMLElement } | null>(null);
+  const [graveyardOwnerId, setGraveyardOwnerId] = useState<number | null>(null);
   const [dismissedPointerIds, setDismissedPointerIds] = useState<Set<string>>(new Set());
   const containerRef = useRef<HTMLDivElement>(null);
   // Maps "card:<id>" / "player:<id>" to its rendered element — populated by
@@ -706,6 +777,9 @@ export default function Board() {
           onEntityFallbackClick={choice ? undefined : (ref) => runAction(() => api.selectEntity(ref))}
           registerElementRef={registerElementRef}
           onInfoClick={setDetailCardName}
+          onHoverStart={(name, el) => setHoverCard({ name, el })}
+          onHoverEnd={() => setHoverCard(null)}
+          onGraveyardClick={() => setGraveyardOwnerId(opponent.id)}
         />
       )}
 
@@ -722,6 +796,9 @@ export default function Board() {
           onEntityFallbackClick={choice ? undefined : (ref) => runAction(() => api.selectEntity(ref))}
           registerElementRef={registerElementRef}
           onInfoClick={setDetailCardName}
+          onHoverStart={(name, el) => setHoverCard({ name, el })}
+          onHoverEnd={() => setHoverCard(null)}
+          onGraveyardClick={() => setGraveyardOwnerId(human.id)}
         />
       )}
 
@@ -778,6 +855,17 @@ export default function Board() {
       {detailCardName && (
         <CardDetailModal cardName={detailCardName} onClose={() => setDetailCardName(null)} />
       )}
+
+      {hoverCard && <CardHoverPreview name={hoverCard.name} anchor={hoverCard.el} />}
+
+      {graveyardOwnerId != null &&
+        (() => {
+          const owner = state.players.find((p) => p.id === graveyardOwnerId);
+          if (!owner) return null;
+          return (
+            <GraveyardModal playerName={owner.name} cards={owner.graveyard} onClose={() => setGraveyardOwnerId(null)} />
+          );
+        })()}
     </div>
   );
 }

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import * as api from './api';
 import type { CardInfo, DeckCard, DecksList, Legality } from './types';
 import { ManaPips } from './manaCost';
+import { CardArt } from './CardArt';
+import { DecoCorners } from './DecoCorner';
 import './Deckbuilder.css';
 
 export default function Deckbuilder() {
@@ -125,6 +127,7 @@ export default function Deckbuilder() {
 
       <div className="layout">
         <section className="panel">
+          <DecoCorners />
           <h2>Card search</h2>
           <input
             className="search-input"
@@ -136,6 +139,7 @@ export default function Deckbuilder() {
           <div className="card-list">
             {searchResults.map((card) => (
               <div className="card-row" key={card.name} onClick={() => addCard(card.name)}>
+                <CardArt name={card.name} variant="crop" className="card-row-art" />
                 <div className="card-row-main">
                   <div className="card-name">{card.name}</div>
                   <div className="card-meta">
@@ -154,6 +158,7 @@ export default function Deckbuilder() {
         </section>
 
         <section className="panel">
+          <DecoCorners />
           <div className="deck-header">
             <h2>{deckName || 'Untitled deck'}</h2>
             <span className="deck-size">{deckSize}</span>
@@ -161,6 +166,7 @@ export default function Deckbuilder() {
           <div className="deck-list">
             {deckCards.map((c) => (
               <div className="deck-row" key={c.name}>
+                <CardArt name={c.name} variant="crop" className="deck-row-art" />
                 <span className="deck-row-name">{c.name}</span>
                 <div className="count-controls">
                   <button onClick={() => adjustCount(c.name, -1)}>−</button>
@@ -179,6 +185,7 @@ export default function Deckbuilder() {
         </section>
 
         <section className="panel">
+          <DecoCorners />
           <h2>Format &amp; legality</h2>
           <select
             className="format-select"
