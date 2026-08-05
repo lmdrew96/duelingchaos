@@ -8,6 +8,8 @@ export type CardInfo = {
   oracleText: string;
 };
 
+export type CardSearchResult = { cards: CardInfo[]; truncated: boolean };
+
 export type DeckCard = { name: string; count: number };
 
 export type DeckSummary = { name: string; deckSize: number; cards: DeckCard[] };

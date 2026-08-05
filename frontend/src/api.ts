@@ -1,4 +1,4 @@
-import type { CardInfo, DeckCard, DeckSummary, DecksList, EntityRef, GameState, Legality } from './types';
+import type { CardInfo, CardSearchResult, DeckCard, DeckSummary, DecksList, EntityRef, GameState, Legality } from './types';
 
 const BASE = '/api';
 
@@ -6,22 +6,23 @@ function toDecklistText(cards: DeckCard[]): string {
   return cards.map((c) => `${c.count} ${c.name}`).join('\n');
 }
 
-export async function searchCards(query: string, limit = 40): Promise<CardInfo[]> {
+export async function searchCards(query: string, limit = 300): Promise<CardSearchResult> {
   const res = await fetch(`${BASE}/cards/search?q=${encodeURIComponent(query)}&limit=${limit}`);
-  const results: CardInfo[] = await res.json();
+  const { cards, truncated }: CardSearchResult = await res.json();
   // Forge's raw card scripts use a literal "\n" (backslash-n) for a
   // paragraph break in oracle text, not an actual newline character — every
   // display surface expects real ones (white-space: pre-wrap / line-clamp).
-  return results.map((c) => (c.oracleText ? { ...c, oracleText: c.oracleText.replace(/\\n/g, '\n') } : c));
+  const normalized = cards.map((c) => (c.oracleText ? { ...c, oracleText: c.oracleText.replace(/\\n/g, '\n') } : c));
+  return { cards: normalized, truncated };
 }
 
 // /cards/search matches by substring, not exact name — a board card's name
 // is always a real card name though, so an exact case-insensitive match
 // (falling back to the first hit) reliably resolves it to its full detail.
 export async function getCardDetail(name: string): Promise<CardInfo | null> {
-  const results = await searchCards(name, 5);
-  if (results.length === 0) return null;
-  return results.find((c) => c.name.toLowerCase() === name.toLowerCase()) ?? results[0];
+  const { cards } = await searchCards(name, 5);
+  if (cards.length === 0) return null;
+  return cards.find((c) => c.name.toLowerCase() === name.toLowerCase()) ?? cards[0];
 }
 
 export async function listFormats(): Promise<string[]> {

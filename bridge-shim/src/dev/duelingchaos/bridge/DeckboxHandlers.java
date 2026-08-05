@@ -52,19 +52,25 @@ public final class DeckboxHandlers {
     private static void handleCardSearch(HttpExchange exchange) throws IOException {
         Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
         String q = query.getOrDefault("q", "");
-        int limit = parseIntOr(query.get("limit"), 50);
-        if (limit > 200) limit = 200;
+        int limit = parseIntOr(query.get("limit"), 300);
+        if (limit > 500) limit = 500;
 
         Predicate<CardRules> predicate = ScryfallQuery.parse(q);
         CardDb db = StaticData.instance().getCommonCards();
+        // Collect one past the limit so we can report whether the match set
+        // was actually truncated, without a separate full-scan count pass.
         List<PaperCard> results = new ArrayList<>();
+        boolean truncated = false;
         for (PaperCard pc : db.getUniqueCards()) {
-            if (results.size() >= limit) break;
             if (predicate.test(pc.getRules())) {
+                if (results.size() >= limit) {
+                    truncated = true;
+                    break;
+                }
                 results.add(pc);
             }
         }
-        respond(exchange, 200, CardDbJson.serializeCards(results));
+        respond(exchange, 200, CardDbJson.serializeCardSearch(results, truncated));
     }
 
     private static void handleFormatsList(HttpExchange exchange) throws IOException {

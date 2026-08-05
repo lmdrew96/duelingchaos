@@ -43,6 +43,7 @@ function DeckbuilderCore({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<CardInfo[]>([]);
+  const [searchTruncated, setSearchTruncated] = useState(false);
 
   const [deckName, setDeckName] = useState('');
   const [deckCards, setDeckCards] = useState<DeckCard[]>([]);
@@ -83,10 +84,22 @@ function DeckbuilderCore({
   // is allowed to write its results.
   const searchRequestId = useRef(0);
   useEffect(() => {
+    // An empty query matches every card in Forge's database (tens of
+    // thousands of entries) — searching only once the user has typed
+    // something avoids firing that worst case on every page load.
+    if (searchQuery.trim() === '') {
+      searchRequestId.current++;
+      setSearchResults([]);
+      setSearchTruncated(false);
+      return;
+    }
     const handle = setTimeout(() => {
       const requestId = ++searchRequestId.current;
-      api.searchCards(searchQuery, 40).then((results) => {
-        if (requestId === searchRequestId.current) setSearchResults(results);
+      api.searchCards(searchQuery).then(({ cards, truncated }) => {
+        if (requestId === searchRequestId.current) {
+          setSearchResults(cards);
+          setSearchTruncated(truncated);
+        }
       });
     }, 200);
     return () => clearTimeout(handle);
@@ -253,8 +266,14 @@ function DeckbuilderCore({
                 <ManaPips cost={card.manaCost} size="md" />
               </div>
             ))}
-            {searchResults.length === 0 && (
+            {searchResults.length === 0 && searchQuery.trim() !== '' && (
               <p className="empty-hint">No cards found.</p>
+            )}
+            {searchResults.length === 0 && searchQuery.trim() === '' && (
+              <p className="empty-hint">Type a card name or search syntax to begin.</p>
+            )}
+            {searchTruncated && (
+              <p className="empty-hint">Showing first {searchResults.length} matches — refine your search to see more.</p>
             )}
           </div>
         </section>

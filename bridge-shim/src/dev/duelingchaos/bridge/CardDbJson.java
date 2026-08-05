@@ -27,6 +27,15 @@ public final class CardDbJson {
         return sb.toString();
     }
 
+    public static String serializeCardSearch(List<PaperCard> cards, boolean truncated) {
+        StringBuilder sb = new StringBuilder();
+        sb.append('{');
+        sb.append("\"cards\":").append(serializeCards(cards)).append(',');
+        sb.append("\"truncated\":").append(truncated);
+        sb.append('}');
+        return sb.toString();
+    }
+
     private static void writeCard(StringBuilder sb, PaperCard pc) {
         CardRules r = pc.getRules();
         sb.append('{');
