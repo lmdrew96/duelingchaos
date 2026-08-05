@@ -8,7 +8,11 @@ function toDecklistText(cards: DeckCard[]): string {
 
 export async function searchCards(query: string, limit = 40): Promise<CardInfo[]> {
   const res = await fetch(`${BASE}/cards/search?q=${encodeURIComponent(query)}&limit=${limit}`);
-  return res.json();
+  const results: CardInfo[] = await res.json();
+  // Forge's raw card scripts use a literal "\n" (backslash-n) for a
+  // paragraph break in oracle text, not an actual newline character — every
+  // display surface expects real ones (white-space: pre-wrap / line-clamp).
+  return results.map((c) => (c.oracleText ? { ...c, oracleText: c.oracleText.replace(/\\n/g, '\n') } : c));
 }
 
 // /cards/search matches by substring, not exact name — a board card's name

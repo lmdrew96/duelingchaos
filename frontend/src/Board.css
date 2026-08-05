@@ -313,7 +313,7 @@
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
-  padding-right: 12px;
+  padding-right: 20px;
 }
 
 .card-tile-cost {
@@ -626,6 +626,8 @@
 .choice-option {
   font-size: 0.78rem;
   padding: 6px 12px;
+  max-width: 100%;
+  white-space: normal;
 }
 
 .choice-option.selected {

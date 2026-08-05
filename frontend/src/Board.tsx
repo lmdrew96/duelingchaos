@@ -3,7 +3,7 @@ import * as api from './api';
 import type { BoardCard, CardInfo, EntityRef, GameState, PendingChoice, PlayerState, PointerInfo, StackItem } from './types';
 import { ManaPips } from './manaCost';
 import { CardArt } from './CardArt';
-import { DecoCorner, DecoCorners } from './DecoCorner';
+import { DecoCorners } from './DecoCorner';
 import './Board.css';
 
 const POLL_INTERVAL_MS = 1000;
@@ -608,6 +608,12 @@ export default function Board() {
       .then((s) => {
         setState(s);
         setError(null);
+        // A board refresh can unmount the tile currently under the cursor
+        // (e.g. a card changing zones) without ever firing onMouseLeave —
+        // drop the stale hover if its anchor is no longer in the document,
+        // or CardHoverPreview reads a zeroed rect from the dead node and
+        // pins itself to the top-left corner instead of disappearing.
+        setHoverCard((prev) => (prev && !document.contains(prev.el) ? null : prev));
         // Drop dismissals whose condition no longer holds, so the same id
         // (e.g. "land-drop") can nudge again once it recurs next turn,
         // instead of staying silently dismissed forever.

@@ -67,6 +67,7 @@
   padding: 8px;
   border: 1px solid transparent;
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .card-row:hover {
@@ -123,6 +124,7 @@
   gap: 8px;
   padding: 4px 0;
   border-bottom: 1px solid rgba(65, 96, 117, 0.3);
+  flex-shrink: 0;
 }
 
 .deck-row-art {
@@ -230,6 +232,7 @@
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.85rem;
+  flex-shrink: 0;
 }
 
 .load-item:hover {

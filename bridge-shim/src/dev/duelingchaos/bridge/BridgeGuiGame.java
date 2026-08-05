@@ -398,7 +398,18 @@ public class BridgeGuiGame extends AbstractGuiGame {
     @Override
     public void showPromptMessage(PlayerView player, String message, CardView referenceCard) {
         System.out.println("[gui prompt] " + player + ": " + message);
-        promptMessage = message;
+        promptMessage = stripRedundantYouPrefix(message);
+    }
+
+    // Forge's own prompt text already opens with the player's name (e.g.
+    // "You, you have won the coin toss."). Since the human seat is
+    // literally named "You" (see BridgeMain — also what the board HUD shows
+    // next to the life total), that reads as a stutter. Strip the redundant
+    // prefix here rather than renaming the seat.
+    private static String stripRedundantYouPrefix(String message) {
+        if (!message.startsWith("You, ")) return message;
+        String rest = message.substring(5);
+        return rest.isEmpty() ? rest : Character.toUpperCase(rest.charAt(0)) + rest.substring(1);
     }
 
     @Override
