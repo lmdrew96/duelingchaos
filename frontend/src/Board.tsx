@@ -4,6 +4,8 @@ import type { BoardCard, CardInfo, EntityRef, GameState, PendingChoice, PlayerSt
 import { ManaPips } from './manaCost';
 import { CardArt } from './CardArt';
 import { DecoCorners } from './DecoCorner';
+import { DecoCrown } from './DecoCrown';
+import { DecoRule } from './DecoRule';
 import './Board.css';
 
 const POLL_INTERVAL_MS = 1000;
@@ -25,9 +27,11 @@ function manaPipClass(label: string): string | null {
   return MANA_PIP_CLASS[label.trim().toLowerCase()] ?? null;
 }
 
-// A double-line hex ring with diamond finials at each vertex — the
+// A triple-line hex ring with diamond finials at each vertex — the
 // reference deco kit's signature is concentric strokes + diamond ticks,
-// not a single flat-filled shape.
+// not a single flat-filled shape. The opponent's badge stays flat/muted
+// (no gradient, no glow) so the active player's own life total keeps the
+// visual weight.
 const HEX_OUTER: [number, number][] = [
   [25, 0],
   [75, 0],
@@ -36,15 +40,17 @@ const HEX_OUTER: [number, number][] = [
   [25, 100],
   [0, 50],
 ];
-const HEX_INNER: [number, number][] = HEX_OUTER.map(([x, y]) => [50 + (x - 50) * 0.82, 50 + (y - 50) * 0.82]);
+const HEX_MID: [number, number][] = HEX_OUTER.map(([x, y]) => [50 + (x - 50) * 0.82, 50 + (y - 50) * 0.82]);
+const HEX_INNER: [number, number][] = HEX_OUTER.map(([x, y]) => [50 + (x - 50) * 0.64, 50 + (y - 50) * 0.64]);
 const toPoints = (pts: [number, number][]) => pts.map(([x, y]) => `${x},${y}`).join(' ');
 
 function LifeBadgeOrnament({ opponent }: { opponent?: boolean }) {
-  const color = opponent ? 'var(--blue-muted)' : 'var(--gold)';
+  const color = opponent ? 'var(--blue-muted)' : 'url(#gold-gradient)';
   return (
-    <svg viewBox="0 0 100 100" className="life-badge-svg" aria-hidden>
+    <svg viewBox="0 0 100 100" className={`life-badge-svg${opponent ? '' : ' glow'}`} aria-hidden>
       <polygon points={toPoints(HEX_OUTER)} fill="none" stroke={color} strokeWidth={3} />
-      <polygon points={toPoints(HEX_INNER)} fill="none" stroke={color} strokeWidth={1.5} opacity={0.7} />
+      <polygon points={toPoints(HEX_MID)} fill="none" stroke={color} strokeWidth={1.5} opacity={0.7} />
+      <polygon points={toPoints(HEX_INNER)} fill="none" stroke={color} strokeWidth={1} opacity={0.45} />
       {HEX_OUTER.map(([x, y], i) => (
         <rect key={i} x={x - 3} y={y - 3} width={6} height={6} fill={color} transform={`rotate(45 ${x} ${y})`} />
       ))}
@@ -267,7 +273,7 @@ function PlayerZone({
           );
         })}
       </div>
-      <div className="board-divider" />
+      <DecoRule />
       <div className="card-row">
         {faceDownHand ? (
           <CardBacks count={player.hand.length} />
@@ -322,6 +328,7 @@ function ChoicePanel({
     return (
       <div className="choice-panel">
         <DecoCorners />
+        <DecoCrown />
         <p className="choice-title">{choice.title}</p>
         <div className="choice-number-row">
           <input type="number" min={0} value={numberValue} onChange={(e) => setNumberValue(e.target.value)} />
@@ -340,6 +347,7 @@ function ChoicePanel({
     return (
       <div className="choice-panel">
         <DecoCorners />
+        <DecoCrown />
         <p className="choice-title">
           {choice.attacker} assigns {choice.damage} damage
         </p>
@@ -377,6 +385,7 @@ function ChoicePanel({
   return (
     <div className="choice-panel">
       <DecoCorners />
+      <DecoCrown />
       <p className="choice-title">{choice.title}</p>
       {boardIsPicker ? (
         <p className="choice-hint">Click a highlighted target on the board.</p>
@@ -458,6 +467,7 @@ function CardDetailModal({ cardName, onClose }: { cardName: string; onClose: () 
     <div className="card-detail-backdrop" onClick={onClose}>
       <div className="card-detail-panel" onClick={(e) => e.stopPropagation()}>
         <DecoCorners />
+        <DecoCrown />
         <button type="button" className="ghost card-detail-close" onClick={onClose}>
           close
         </button>
@@ -521,6 +531,7 @@ function GraveyardModal({
     <div className="card-detail-backdrop" onClick={onClose}>
       <div className="card-detail-panel graveyard-panel" onClick={(e) => e.stopPropagation()}>
         <DecoCorners />
+        <DecoCrown />
         <button type="button" className="ghost card-detail-close" onClick={onClose}>
           close
         </button>
@@ -821,6 +832,7 @@ export default function Board() {
       {!choice && prompt?.message && (
         <div className="prompt-panel">
           <DecoCorners />
+        <DecoCrown />
           <p className="prompt-message">{prompt.message}</p>
           <div className="prompt-buttons">
             {prompt.button1Enabled && (

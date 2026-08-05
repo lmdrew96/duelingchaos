@@ -26,11 +26,13 @@
   height: 14px;
 }
 
+/* % based (not px) so the point stays proportional even on a near-zero-height
+   bar — matches the "8 Progress Bars" reference's faceted, not rounded, caps. */
 .curve-bar {
   width: 100%;
   min-height: 2px;
   background: var(--gold);
-  border-radius: 2px 2px 0 0;
+  clip-path: polygon(0 8%, 50% 0, 100% 8%, 100% 100%, 0 100%);
 }
 
 .curve-label {
@@ -69,18 +71,19 @@
 .color-swatch-g { background: #00733e; }
 .color-swatch-c { background: #bdbdbd; }
 
+/* Flush rectangle, not rounded — a rounded right edge would clip the
+   faceted point off .color-bar-fill whenever a bar nears full width. */
 .color-bar-track {
   flex: 1;
   height: 8px;
   background: rgba(65, 96, 117, 0.3);
-  border-radius: 4px;
   overflow: hidden;
 }
 
 .color-bar-fill {
   height: 100%;
   background: var(--blue-muted);
-  border-radius: 4px;
+  clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 50%, calc(100% - 4px) 100%, 0 100%);
 }
 
 .color-count {

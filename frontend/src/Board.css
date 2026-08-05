@@ -27,6 +27,8 @@
 }
 
 .board-hud .refresh-btn {
+  clip-path: none;
+  border-radius: 999px;
   border-color: var(--blue-muted);
   color: var(--text-muted);
   padding: 4px 14px;
@@ -42,7 +44,6 @@
   color: var(--bg);
   font-weight: 600;
   padding: 5px 20px;
-  clip-path: polygon(12% 0, 88% 0, 100% 50%, 88% 100%, 12% 100%, 0 50%);
   box-shadow: inset 0 0 0 2px var(--bg);
 }
 
@@ -83,6 +84,7 @@
 }
 
 .pointer-chip-dismiss {
+  clip-path: none;
   border: none;
   padding: 0 2px;
   color: var(--text-muted);
@@ -95,10 +97,19 @@
   color: var(--gold);
 }
 
+/* .board-shell is a column flex container with no align-items override, so
+   without this these stretch to the full viewport width (pre-existing gap —
+   every other singular panel here, e.g. .prompt-panel/.choice-panel/
+   .stack-rail, already sets its own align-self: center). */
 .board-error {
+  align-self: center;
   text-align: center;
   color: var(--danger);
   font-size: 0.9rem;
+}
+
+.board-error + .refresh-btn {
+  align-self: center;
 }
 
 .board-zone {
@@ -143,6 +154,10 @@
   height: 100%;
 }
 
+.life-badge-svg.glow {
+  filter: drop-shadow(0 0 5px rgba(237, 202, 55, 0.55));
+}
+
 .life-badge .life-value {
   position: relative;
   font-family: var(--mono);
@@ -163,6 +178,7 @@
 }
 
 .zone-count-btn {
+  clip-path: none;
   border: none;
   padding: 0;
   border-radius: 0;
@@ -337,6 +353,7 @@
   width: 16px;
   height: 16px;
   padding: 0;
+  clip-path: none;
   border-radius: 50%;
   border: 1px solid var(--blue-muted);
   color: var(--text-muted);
@@ -371,7 +388,7 @@
   max-height: 80vh;
   overflow-y: auto;
   border: 1px solid var(--gold);
-  box-shadow: inset 0 0 0 4px var(--bg-panel), inset 0 0 0 5px var(--blue-mid);
+  box-shadow: inset 0 0 0 4px var(--bg-panel), inset 0 0 0 5px var(--blue-mid), 0 0 26px rgba(237, 202, 55, 0.22);
   background: var(--bg-panel);
   padding: 18px 22px;
 }
@@ -456,6 +473,7 @@
 .graveyard-card {
   width: 92px;
   padding: 0;
+  clip-path: none;
   border: 1px solid var(--blue-mid);
   border-radius: 0;
   display: flex;
@@ -547,17 +565,12 @@
   background: var(--blue-deep);
 }
 
-.board-divider {
-  border-top: 1px solid var(--blue-mid);
-  margin: 4px 0;
-}
-
 .prompt-panel {
   position: relative;
   align-self: center;
   max-width: 520px;
   border: 1px solid var(--gold);
-  box-shadow: inset 0 0 0 4px var(--bg-panel), inset 0 0 0 5px var(--blue-mid);
+  box-shadow: inset 0 0 0 4px var(--bg-panel), inset 0 0 0 5px var(--blue-mid), 0 0 26px rgba(237, 202, 55, 0.22);
   background: var(--bg-panel);
   padding: 16px 22px;
   text-align: center;
@@ -582,7 +595,7 @@
   align-self: center;
   max-width: 560px;
   border: 1px solid var(--gold);
-  box-shadow: inset 0 0 0 4px var(--bg-panel), inset 0 0 0 5px var(--blue-mid);
+  box-shadow: inset 0 0 0 4px var(--bg-panel), inset 0 0 0 5px var(--blue-mid), 0 0 26px rgba(237, 202, 55, 0.22);
   background: var(--bg-panel);
   padding: 16px 22px;
   text-align: center;
@@ -590,15 +603,27 @@
 
 .deco-corner {
   position: absolute;
-  width: 18px;
-  height: 18px;
+  width: 26px;
+  height: 26px;
   pointer-events: none;
+  filter: drop-shadow(0 0 3px rgba(237, 202, 55, 0.65));
 }
 
 .deco-corner.tl { top: -1px; left: -1px; }
 .deco-corner.tr { top: -1px; right: -1px; transform: scaleX(-1); }
 .deco-corner.bl { bottom: -1px; left: -1px; transform: scaleY(-1); }
 .deco-corner.br { bottom: -1px; right: -1px; transform: scale(-1, -1); }
+
+.deco-crown {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 48px;
+  height: 28px;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px rgba(237, 202, 55, 0.6));
+}
 
 .choice-title {
   font-family: var(--mono);
@@ -646,6 +671,7 @@
 .choice-pip {
   width: 36px;
   height: 36px;
+  clip-path: none;
   border-radius: 50%;
   padding: 0;
   border: 2px solid transparent;

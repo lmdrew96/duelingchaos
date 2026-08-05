@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Deckbuilder from './Deckbuilder';
 import Board from './Board';
+import { DecoDefs } from './DecoDefs';
 import './App.css';
 
 type View = 'deckbuilder' | 'board';
@@ -10,6 +11,7 @@ function App() {
 
   return (
     <>
+      <DecoDefs />
       <nav className="view-switcher">
         <button
           className={view === 'deckbuilder' ? 'active' : 'ghost'}

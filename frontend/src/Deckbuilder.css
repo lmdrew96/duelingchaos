@@ -7,11 +7,16 @@
 
 .app-header {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+}
+
+.app-header-row {
+  display: flex;
   justify-content: space-between;
   align-items: baseline;
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--blue-mid);
-  padding-bottom: 16px;
 }
 
 .app-header .subtitle {
@@ -145,7 +150,11 @@
   gap: 4px;
 }
 
+/* A dozen-plus of these render at once (one pair per deck row) — stays
+   plain like .card-tile, not a facet per button, to avoid visual noise. */
 .count-controls button {
+  clip-path: none;
+  border-radius: 999px;
   padding: 2px 10px;
   line-height: 1.2;
 }
@@ -240,6 +249,7 @@
 }
 
 .load-item .delete-btn {
+  clip-path: none;
   border: none;
   padding: 0 4px;
   font-size: 0.75rem;

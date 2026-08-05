@@ -4,6 +4,7 @@ import type { CardInfo, DeckCard, DecksList, Legality } from './types';
 import { ManaPips, manaValue } from './manaCost';
 import { CardArt } from './CardArt';
 import { DecoCorners } from './DecoCorner';
+import { DecoRule } from './DecoRule';
 import { DeckStats } from './DeckStats';
 import './Deckbuilder.css';
 
@@ -178,8 +179,11 @@ export default function Deckbuilder() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <h1>DuelingChaos — Deckbuilder</h1>
-        <span className="subtitle">{deckSize} cards in deck</span>
+        <div className="app-header-row">
+          <h1>DuelingChaos — Deckbuilder</h1>
+          <span className="subtitle">{deckSize} cards in deck</span>
+        </div>
+        <DecoRule />
       </header>
 
       <div className="layout">
