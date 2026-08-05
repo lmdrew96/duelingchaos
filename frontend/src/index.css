@@ -1,0 +1,100 @@
+:root {
+  /* Arabic-deco palette — see the "Polish" ChaosPatch for the full phase-5
+     visual direction. This deckbuilder screen only borrows the palette and
+     "gold hairline, not filled panel" logic; the deco linework/faceted
+     corners/hex badges are deferred phase-5 work. */
+  --bg: #08262d; /* Black Box */
+  --bg-panel: #0c2f38;
+  --gold: #edca37; /* Angelic Descent */
+  --blue-deep: #053c49; /* Crowberry Blue */
+  --blue-mid: #105869; /* Tropical Skies */
+  --blue-muted: #416075; /* Steel Blue Grey */
+  --text: #ebe7d9; /* Dried Coconut */
+  --text-muted: #96c2cd; /* Blue Chalk */
+  --danger: #d9765a;
+  --ok: #7fbf7f;
+
+  --sans: 'Space Grotesk', system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, Consolas, monospace;
+
+  font: 16px/1.5 var(--sans);
+  color-scheme: dark;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 500;
+  color: var(--gold);
+  margin: 0;
+}
+
+button,
+input,
+select {
+  font-family: var(--sans);
+  font-size: inherit;
+  color: var(--text);
+}
+
+button {
+  background: transparent;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  border-radius: 999px;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--gold);
+  color: var(--bg);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+button.ghost {
+  border-color: var(--blue-muted);
+  color: var(--text-muted);
+}
+
+button.ghost:hover:not(:disabled) {
+  background: var(--blue-muted);
+  color: var(--text);
+}
+
+input,
+select {
+  background: var(--bg);
+  border: 1px solid var(--blue-mid);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.mono {
+  font-family: var(--mono);
+}

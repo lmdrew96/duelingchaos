@@ -1,0 +1,250 @@
+.app-shell {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+  min-height: 100svh;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--blue-mid);
+  padding-bottom: 16px;
+}
+
+.app-header .subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 0.9fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--blue-mid);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.panel h2 {
+  font-size: 1.05rem;
+  margin-bottom: 12px;
+}
+
+.search-input {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.card-list,
+.deck-list,
+.load-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.card-row:hover {
+  border-color: var(--gold);
+}
+
+.card-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-name {
+  font-weight: 500;
+}
+
+.card-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.card-oracle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mana-cost {
+  font-family: var(--mono);
+  color: var(--gold);
+  font-size: 0.85rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.deck-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.deck-size {
+  font-family: var(--mono);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.deck-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(65, 96, 117, 0.3);
+}
+
+.deck-row-name {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.count-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.count-controls button {
+  padding: 2px 10px;
+  line-height: 1.2;
+}
+
+.count-value {
+  font-family: var(--mono);
+  min-width: 1.5em;
+  text-align: center;
+  display: inline-block;
+}
+
+.empty-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.legality-badge {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.legality-legal {
+  background: var(--ok);
+  color: var(--bg);
+}
+
+.legality-illegal {
+  background: var(--danger);
+  color: var(--bg);
+}
+
+.legality-problem {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  margin: 6px 0 0;
+}
+
+.deck-name-input {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.save-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.save-row button {
+  flex-shrink: 0;
+}
+
+.field-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.format-select {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.load-section {
+  margin-top: 16px;
+}
+
+.load-filter {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.load-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.load-item:hover {
+  background: rgba(237, 202, 55, 0.1);
+}
+
+.load-item .delete-btn {
+  border: none;
+  padding: 0 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.load-item .delete-btn:hover {
+  background: transparent;
+  color: var(--danger);
+}
+
+.status-message {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+}

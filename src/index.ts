@@ -6,6 +6,7 @@ const PROJECT_ROOT = path.join(__dirname, '..');
 const FORGE_DIR = path.join(PROJECT_ROOT, 'vendor', 'forge');
 const FORGE_JAR = path.join(FORGE_DIR, 'forge-gui-desktop-2.0.13-jar-with-dependencies.jar');
 const SHIM_BUILD_DIR = path.join(PROJECT_ROOT, 'bridge-shim', 'build');
+const DECKS_DIR = path.join(PROJECT_ROOT, 'decks');
 
 const JAVA_PORT = 8787;
 const HTTP_PORT = Number(process.env.PORT) || 4310;
@@ -20,7 +21,7 @@ function startForgeShim(): Promise<ChildProcessWithoutNullStreams> {
     const classpath = `${FORGE_JAR}:${SHIM_BUILD_DIR}`;
     const child = spawn(
       'java',
-      ['-cp', classpath, 'dev.duelingchaos.bridge.BridgeMain', DECK1, DECK2, String(JAVA_PORT)],
+      ['-cp', classpath, 'dev.duelingchaos.bridge.BridgeMain', DECK1, DECK2, String(JAVA_PORT), DECKS_DIR],
       { cwd: FORGE_DIR },
     );
 
@@ -48,7 +49,7 @@ function proxyToShim(
   req: http.IncomingMessage,
   res: http.ServerResponse,
   shimPath: string,
-  method: 'GET' | 'POST',
+  method: string,
 ): void {
   const forward = async (): Promise<void> => {
     const chunks: Buffer[] = [];
@@ -56,10 +57,11 @@ function proxyToShim(
       chunks.push(chunk as Buffer);
     }
     const body = method === 'POST' ? Buffer.concat(chunks) : undefined;
+    const contentType = req.headers['content-type'] ?? 'application/json';
 
     const upstream = await fetch(`http://127.0.0.1:${JAVA_PORT}${shimPath}`, {
       method,
-      headers: method === 'POST' ? { 'Content-Type': 'application/json' } : undefined,
+      headers: method === 'POST' ? { 'Content-Type': contentType } : undefined,
       body,
     });
     const responseBody = await upstream.text();
@@ -82,9 +84,12 @@ async function main(): Promise<void> {
       proxyToShim(req, res, '/state', 'GET');
       return;
     }
-    if (req.url?.startsWith('/api/action/') && req.method === 'POST') {
-      const shimPath = req.url.replace('/api/action/', '/action/');
-      proxyToShim(req, res, shimPath, 'POST');
+    // Every other bridge endpoint (actions, card search, formats, decks,
+    // legality) mirrors its shim path 1:1 under /api — just strip the
+    // prefix and forward.
+    if (req.url?.startsWith('/api/') && (req.method === 'GET' || req.method === 'POST')) {
+      const shimPath = req.url.slice('/api'.length);
+      proxyToShim(req, res, shimPath, req.method);
       return;
     }
     res.writeHead(404);

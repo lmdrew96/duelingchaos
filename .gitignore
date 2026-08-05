@@ -15,3 +15,6 @@ yarn-error.log*
 
 # Vendored Forge engine (large binaries, fetched locally per-machine)
 /vendor/
+
+# User-saved decks (personal, no cloud sync — see deckbuilder patch)
+/decks/

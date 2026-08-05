@@ -44,7 +44,7 @@ public class BridgeMain {
 
     public static void main(String[] args) throws IOException {
         if (args.length < 2) {
-            System.err.println("Usage: BridgeMain <deck1.dck> <deck2.dck> [port]");
+            System.err.println("Usage: BridgeMain <deck1.dck> <deck2.dck> [port] [decksDir]");
             System.exit(1);
         }
 
@@ -59,6 +59,7 @@ public class BridgeMain {
         }
 
         int port = args.length > 2 ? Integer.parseInt(args[2]) : 8787;
+        File decksDir = args.length > 3 ? new File(args[3]) : new File("decks");
 
         GameRules rules = new GameRules(GameType.Constructed);
         rules.setAppliedVariants(EnumSet.of(GameType.Constructed));
@@ -101,6 +102,7 @@ public class BridgeMain {
         server.createContext("/action/tap-land", BridgeMain::handleTapLand);
         server.createContext("/action/select-ok", exchange -> handleButton(exchange, true));
         server.createContext("/action/select-cancel", exchange -> handleButton(exchange, false));
+        DeckboxHandlers.register(server, decksDir);
         server.setExecutor(null);
         server.start();
         System.out.println("BRIDGE_READY port=" + port);
