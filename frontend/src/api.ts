@@ -29,29 +29,43 @@ export async function listFormats(): Promise<string[]> {
   return res.json();
 }
 
-export async function listDecks(): Promise<DecksList> {
-  const res = await fetch(`${BASE}/decks/list`);
+// Presets and card search stay open to anyone hitting the bridge; saved
+// decks are Clerk-gated (see src/auth.ts, src/db.ts), so every saved-deck
+// call takes the caller's Clerk session token (Deckbuilder gets it from
+// useAuth().getToken()) and forwards it as a bearer token. Loading presets
+// or listing decks while signed out is fine — token is simply omitted.
+function authHeaders(token: string | null): HeadersInit | undefined {
+  return token ? { Authorization: `Bearer ${token}` } : undefined;
+}
+
+export async function listDecks(token: string | null): Promise<DecksList> {
+  const res = await fetch(`${BASE}/decks/list`, { headers: authHeaders(token) });
   return res.json();
 }
 
-export async function getDeck(source: 'preset' | 'saved', name: string): Promise<DeckSummary> {
-  const res = await fetch(`${BASE}/decks/get?source=${source}&name=${encodeURIComponent(name)}`);
+export async function getDeck(source: 'preset' | 'saved', name: string, token: string | null): Promise<DeckSummary> {
+  const res = await fetch(`${BASE}/decks/get?source=${source}&name=${encodeURIComponent(name)}`, {
+    headers: authHeaders(token),
+  });
   if (!res.ok) throw new Error(`deck not found: ${name}`);
   return res.json();
 }
 
-export async function saveDeck(name: string, cards: DeckCard[]): Promise<DeckSummary> {
+export async function saveDeck(name: string, cards: DeckCard[], token: string | null): Promise<DeckSummary> {
   const res = await fetch(`${BASE}/decks/save?name=${encodeURIComponent(name)}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
+    headers: { 'Content-Type': 'text/plain', ...authHeaders(token) },
     body: toDecklistText(cards),
   });
   if (!res.ok) throw new Error('failed to save deck');
   return res.json();
 }
 
-export async function deleteDeck(name: string): Promise<void> {
-  await fetch(`${BASE}/decks/delete?name=${encodeURIComponent(name)}`, { method: 'POST' });
+export async function deleteDeck(name: string, token: string | null): Promise<void> {
+  await fetch(`${BASE}/decks/delete?name=${encodeURIComponent(name)}`, {
+    method: 'POST',
+    headers: authHeaders(token),
+  });
 }
 
 export async function checkLegality(format: string, cards: DeckCard[]): Promise<Legality> {

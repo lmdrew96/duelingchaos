@@ -14,3 +14,9 @@
   background: var(--gold);
   color: var(--bg);
 }
+
+.auth-header {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}

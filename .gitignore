@@ -18,3 +18,9 @@ yarn-error.log*
 
 # User-saved decks (personal, no cloud sync — see deckbuilder patch)
 /decks/
+
+# Secrets — Clerk/Neon credentials (see .env.example, frontend/.env.example)
+.env
+.env.local
+frontend/.env
+frontend/.env.local

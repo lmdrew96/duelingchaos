@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useAuth } from '@clerk/react';
 import * as api from './api';
 import type { CardInfo, DeckCard, DecksList, Legality } from './types';
 import { ManaPips, manaValue } from './manaCost';
@@ -10,7 +11,36 @@ import './Deckbuilder.css';
 
 const CURVE_BUCKETS = 8; // 0,1,2,3,4,5,6,7+
 
+// Only saved-deck CRUD needs a Clerk session (see src/api.ts /
+// src/db.ts) — everything else (search, presets, legality) stays open.
+// useAuth() throws outside a ClerkProvider, so the hook only ever runs in
+// DeckbuilderWithAuth, which only mounts when a publishable key exists;
+// without one, DeckbuilderCore gets a no-op token getter and just shows
+// zero saved decks (the backend already returns saved:[] for an
+// unauthenticated /decks/list, so this reuses that path instead of a
+// separate empty state).
+const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+
 export default function Deckbuilder() {
+  return CLERK_ENABLED ? (
+    <DeckbuilderWithAuth />
+  ) : (
+    <DeckbuilderCore getToken={async () => null} isSignedIn={false} />
+  );
+}
+
+function DeckbuilderWithAuth() {
+  const { getToken, isSignedIn } = useAuth();
+  return <DeckbuilderCore getToken={getToken} isSignedIn={!!isSignedIn} />;
+}
+
+function DeckbuilderCore({
+  getToken,
+  isSignedIn,
+}: {
+  getToken: () => Promise<string | null>;
+  isSignedIn: boolean;
+}) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<CardInfo[]>([]);
 
@@ -32,7 +62,10 @@ export default function Deckbuilder() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   const refreshDecksList = () => {
-    api.listDecks().then(setDecksList).catch(() => undefined);
+    getToken()
+      .then((token) => api.listDecks(token))
+      .then(setDecksList)
+      .catch(() => undefined);
   };
 
   useEffect(() => {
@@ -150,13 +183,19 @@ export default function Deckbuilder() {
 
   const handleSave = async () => {
     if (!deckName.trim() || deckCards.length === 0) return;
-    await api.saveDeck(deckName.trim(), deckCards);
+    const token = await getToken();
+    if (!token) {
+      setStatusMessage('Sign in to save decks.');
+      return;
+    }
+    await api.saveDeck(deckName.trim(), deckCards, token);
     setStatusMessage(`Saved "${deckName.trim()}".`);
     refreshDecksList();
   };
 
   const handleLoad = async (source: 'preset' | 'saved', name: string) => {
-    const deck = await api.getDeck(source, name);
+    const token = source === 'saved' ? await getToken() : null;
+    const deck = await api.getDeck(source, name, token);
     setDeckName(deck.name);
     setDeckCards(deck.cards);
     setStatusMessage(`Loaded "${deck.name}" (${source}).`);
@@ -164,7 +203,9 @@ export default function Deckbuilder() {
 
   const handleDelete = async (name: string, event: React.MouseEvent) => {
     event.stopPropagation();
-    await api.deleteDeck(name);
+    const token = await getToken();
+    if (!token) return;
+    await api.deleteDeck(name, token);
     refreshDecksList();
     setStatusMessage(`Deleted "${name}".`);
   };
@@ -288,13 +329,14 @@ export default function Deckbuilder() {
             onChange={(e) => setDeckName(e.target.value)}
           />
           <div className="save-row">
-            <button onClick={handleSave} disabled={!deckName.trim() || deckCards.length === 0}>
+            <button onClick={handleSave} disabled={!deckName.trim() || deckCards.length === 0 || !isSignedIn}>
               Save
             </button>
             <button className="ghost" onClick={startNewDeck}>
               New deck
             </button>
           </div>
+          {!isSignedIn && <p className="status-message">Sign in to save decks.</p>}
           {statusMessage && <p className="status-message">{statusMessage}</p>}
 
           <div className="load-section">
