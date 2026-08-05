@@ -1,0 +1,17 @@
+{
+  "name": "duelingchaos",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "build:shim": "javac -cp vendor/forge/forge-gui-desktop-2.0.13-jar-with-dependencies.jar -d bridge-shim/build $(find bridge-shim/src -name '*.java')",
+    "clean": "rm -rf dist",
+    "start": "node dist/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "typescript": "^5.5.3"
+  },
+  "private": true
+}
