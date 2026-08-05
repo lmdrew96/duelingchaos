@@ -79,15 +79,16 @@ export async function deleteDeck(name: string, token: string | null): Promise<vo
   });
 }
 
-// Restarts the running match against the fixed AI opponent with a saved
-// deck in the human seat — resolves once the new game is actually ready to
-// poll (see src/index.ts's restartMatch), so the caller can navigate to the
-// board immediately after.
-export async function startMatch(deckName: string, token: string | null): Promise<void> {
+// Restarts the running match with a saved deck in the human seat and a
+// chosen AI opponent deck (a preset name, or 'random'/undefined to pick one
+// of the presets at random server-side) — resolves once the new game is
+// actually ready to poll (see src/index.ts's restartMatch), so the caller
+// can navigate to the board immediately after.
+export async function startMatch(deckName: string, opponentDeck: string | undefined, token: string | null): Promise<void> {
   const res = await fetch(`${BASE}/match/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-    body: JSON.stringify({ deckName }),
+    body: JSON.stringify({ deckName, opponentDeck }),
   });
   if (!res.ok) throw new Error('failed to start match');
 }

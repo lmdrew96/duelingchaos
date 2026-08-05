@@ -259,10 +259,30 @@ async function handleDeckDelete(req: http.IncomingMessage, res: http.ServerRespo
   respondJson(res, 200, { deleted });
 }
 
-// Starts a new match against the fixed AI precon using a signed-in user's
+// Preset AI decks live as .dck files under res/quest/precons (see
+// DeckboxHandlers.PRECON_DIR); /decks/list already reports their names. This
+// resolves a player's opponent choice from handleMatchStart into a concrete
+// .dck path the shim can boot with — 'random'/undefined picks one of the
+// current presets uniformly at random.
+async function resolveOpponentDeckPath(preferredName: string | undefined): Promise<string> {
+  const { presets } = (await fetchShimJson('/decks/list')) as { presets: string[] };
+  if (presets.length === 0) {
+    return DECK2;
+  }
+  let name = preferredName;
+  if (!name || name === 'random') {
+    name = presets[Math.floor(Math.random() * presets.length)];
+  } else if (!presets.includes(name)) {
+    throw new Error(`unknown opponent deck: ${name}`);
+  }
+  return `res/quest/precons/${name}.dck`;
+}
+
+// Starts a new match against a chosen AI opponent using a signed-in user's
 // saved deck — restarts the single Java shim process with that deck instead
 // of the boot-time hardcoded pairing (see the "Start a match from a saved
-// deck" ChaosPatch scoping decision: opponent selection stayed out of scope).
+// deck" ChaosPatch scoping decision, later extended to add opponent deck
+// selection).
 async function handleMatchStart(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   if (req.method !== 'POST') {
     respondJson(res, 405, { error: 'POST only' });
@@ -275,8 +295,11 @@ async function handleMatchStart(req: http.IncomingMessage, res: http.ServerRespo
   }
   const body = await readRequestBody(req);
   let deckName: string | undefined;
+  let opponentDeck: string | undefined;
   try {
-    deckName = (JSON.parse(body) as { deckName?: string }).deckName;
+    const parsed = JSON.parse(body) as { deckName?: string; opponentDeck?: string };
+    deckName = parsed.deckName;
+    opponentDeck = parsed.opponentDeck;
   } catch {
     respondJson(res, 400, { error: 'invalid JSON body' });
     return;
@@ -290,8 +313,15 @@ async function handleMatchStart(req: http.IncomingMessage, res: http.ServerRespo
     respondJson(res, 404, { error: 'deck not found' });
     return;
   }
+  let opponentDeckPath: string;
+  try {
+    opponentDeckPath = await resolveOpponentDeckPath(opponentDeck);
+  } catch (err) {
+    respondJson(res, 400, { error: (err as Error).message });
+    return;
+  }
   const humanDeckPath = writeHumanDecklist(deck.cards);
-  await restartMatch(humanDeckPath, DECK2);
+  await restartMatch(humanDeckPath, opponentDeckPath);
   currentMatch = { userId, deckName, reported: false };
   respondJson(res, 200, { ok: true });
 }

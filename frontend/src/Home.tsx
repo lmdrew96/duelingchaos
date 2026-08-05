@@ -72,6 +72,7 @@ function Dashboard({
   const [matchStats, setMatchStats] = useState<MatchStats>({ wins: 0, losses: 0, draws: 0, recent: [] });
   const [startingDeck, setStartingDeck] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  const [opponentDeck, setOpponentDeck] = useState<string>('random');
 
   useEffect(() => {
     getToken()
@@ -89,7 +90,7 @@ function Dashboard({
     setStartingDeck(name);
     setStartError(null);
     getToken()
-      .then((token) => api.startMatch(name, token))
+      .then((token) => api.startMatch(name, opponentDeck === 'random' ? undefined : opponentDeck, token))
       .then(() => onNavigate('board'))
       .catch(() => setStartError('Could not start a match with that deck.'))
       .finally(() => setStartingDeck(null));
@@ -112,6 +113,19 @@ function Dashboard({
         <section className="panel">
           <DecoCorners />
           <h2>Saved decks ({decksList.saved.length})</h2>
+          <span className="field-label">Opponent deck</span>
+          <select
+            className="format-select"
+            value={opponentDeck}
+            onChange={(e) => setOpponentDeck(e.target.value)}
+          >
+            <option value="random">Random</option>
+            {decksList.presets.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
           {decksList.saved.length === 0 ? (
             <p className="empty-hint">No saved decks yet.</p>
           ) : (
