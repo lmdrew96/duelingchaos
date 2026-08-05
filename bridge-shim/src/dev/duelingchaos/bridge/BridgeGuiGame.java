@@ -390,8 +390,30 @@ public class BridgeGuiGame extends AbstractGuiGame {
     @Override
     public Map<CardView, Integer> assignCombatDamage(CardView attacker, List<CardView> blockers, int damage, GameEntityView defender, boolean overrideOrder, boolean maxPlayerlife) {
         Map<CardView, Integer> result = new java.util.HashMap<>();
-        if (!blockers.isEmpty()) {
+        if (blockers.isEmpty()) {
+            return result;
+        }
+        if (blockers.size() == 1) {
+            // no real choice to make — single blocker takes it all
             result.put(blockers.get(0), damage);
+            return result;
+        }
+        List<String> labels = new ArrayList<>();
+        for (CardView b : blockers) labels.add(entityLabel(b));
+        pendingChoice = PendingChoice.combatDamage(entityLabel(attacker), labels, damage);
+        String answer = awaitChoiceAnswer();
+        pendingChoice = null;
+        List<Integer> amounts = parseIndices(answer);
+        int total = 0;
+        for (int a : amounts) total += a;
+        if (amounts.size() != blockers.size() || total != damage) {
+            // malformed/short answer — fall back to the old deterministic
+            // default rather than hand Forge a split that doesn't sum right
+            result.put(blockers.get(0), damage);
+            return result;
+        }
+        for (int i = 0; i < blockers.size(); i++) {
+            result.put(blockers.get(i), amounts.get(i));
         }
         return result;
     }
