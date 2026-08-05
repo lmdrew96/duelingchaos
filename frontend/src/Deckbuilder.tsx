@@ -259,7 +259,7 @@ function DeckbuilderCore({
       setStatusMessage('Sign in to save decks.');
       return;
     }
-    await api.saveDeck(deckName.trim(), deckCards, token);
+    await api.saveDeck(deckName.trim(), deckCards, format, token);
     setStatusMessage(`Saved "${deckName.trim()}".`);
     refreshDecksList();
   };
@@ -269,6 +269,9 @@ function DeckbuilderCore({
     const deck = await api.getDeck(source, name, token);
     setDeckName(deck.name);
     setDeckCards(deck.cards);
+    // Presets carry no format of their own — only restore it when the saved
+    // deck's format is still a real option in the current format list.
+    if (deck.format && formats.includes(deck.format)) setFormat(deck.format);
     setStatusMessage(`Loaded "${deck.name}" (${source}).`);
   };
 

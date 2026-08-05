@@ -19,7 +19,10 @@ export type CardSearchResult = { cards: CardInfo[]; truncated: boolean };
 export type DeckCardSection = 'commander' | 'sideboard';
 export type DeckCard = { name: string; count: number; section?: DeckCardSection };
 
-export type DeckSummary = { name: string; deckSize: number; cards: DeckCard[] };
+// format is absent for preset decks (static AI-deck files with no format of
+// their own) — present for saved decks, which persist whatever was selected
+// at save time (see Deckbuilder's handleSave/handleLoad).
+export type DeckSummary = { name: string; deckSize: number; cards: DeckCard[]; format?: string };
 
 export type DecksList = { presets: string[]; saved: string[] };
 

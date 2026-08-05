@@ -27,11 +27,16 @@ export function ensureSchema(): Promise<void> {
           user_id TEXT NOT NULL,
           name TEXT NOT NULL,
           cards JSONB NOT NULL,
+          format TEXT,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           UNIQUE (user_id, name)
         )
       `;
+      // Existing decks tables predate the format column — ALTER is the only
+      // way a table created before this patch picks it up (CREATE TABLE IF
+      // NOT EXISTS above is a no-op once the table already exists).
+      await getSql()`ALTER TABLE decks ADD COLUMN IF NOT EXISTS format TEXT`;
       await getSql()`
         CREATE TABLE IF NOT EXISTS match_results (
           id SERIAL PRIMARY KEY,
@@ -62,22 +67,24 @@ export async function listSavedDeckNames(userId: string): Promise<string[]> {
 export async function getSavedDeck(
   userId: string,
   name: string,
-): Promise<{ name: string; cards: StoredDeckCard[] } | null> {
+): Promise<{ name: string; cards: StoredDeckCard[]; format: string } | null> {
   await ensureSchema();
   const rows = (await getSql()`
-    SELECT name, cards FROM decks WHERE user_id = ${userId} AND name = ${name}
-  `) as { name: string; cards: StoredDeckCard[] }[];
+    SELECT name, cards, format FROM decks WHERE user_id = ${userId} AND name = ${name}
+  `) as { name: string; cards: StoredDeckCard[]; format: string | null }[];
   const row = rows[0];
-  return row ? { name: row.name, cards: row.cards } : null;
+  // Decks saved before this column existed have format = null — 'Standard'
+  // matches the deckbuilder's own pre-load default (see Deckbuilder.tsx).
+  return row ? { name: row.name, cards: row.cards, format: row.format ?? 'Standard' } : null;
 }
 
-export async function saveDeck(userId: string, name: string, cards: StoredDeckCard[]): Promise<void> {
+export async function saveDeck(userId: string, name: string, cards: StoredDeckCard[], format: string): Promise<void> {
   await ensureSchema();
   await getSql()`
-    INSERT INTO decks (user_id, name, cards, updated_at)
-    VALUES (${userId}, ${name}, ${JSON.stringify(cards)}, now())
+    INSERT INTO decks (user_id, name, cards, format, updated_at)
+    VALUES (${userId}, ${name}, ${JSON.stringify(cards)}, ${format}, now())
     ON CONFLICT (user_id, name)
-    DO UPDATE SET cards = EXCLUDED.cards, updated_at = now()
+    DO UPDATE SET cards = EXCLUDED.cards, format = EXCLUDED.format, updated_at = now()
   `;
 }
 

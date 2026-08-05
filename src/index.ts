@@ -184,8 +184,12 @@ function parseDecklistText(body: string): StoredDeckCard[] {
   return cards;
 }
 
-function toDeckSummaryJson(name: string, cards: StoredDeckCard[]): { name: string; deckSize: number; cards: StoredDeckCard[] } {
-  return { name, deckSize: cards.reduce((sum, c) => sum + c.count, 0), cards };
+function toDeckSummaryJson(
+  name: string,
+  cards: StoredDeckCard[],
+  format?: string,
+): { name: string; deckSize: number; cards: StoredDeckCard[]; format?: string } {
+  return { name, deckSize: cards.reduce((sum, c) => sum + c.count, 0), cards, format };
 }
 
 // Saved decks are the only thing gated behind Clerk sign-in (see the "Auth
@@ -220,7 +224,7 @@ async function handleDeckGet(req: http.IncomingMessage, res: http.ServerResponse
     respondJson(res, 404, { error: 'deck not found' });
     return;
   }
-  respondJson(res, 200, toDeckSummaryJson(deck.name, deck.cards));
+  respondJson(res, 200, toDeckSummaryJson(deck.name, deck.cards, deck.format));
 }
 
 async function handleDeckSave(req: http.IncomingMessage, res: http.ServerResponse, shimPath: string): Promise<void> {
@@ -239,14 +243,15 @@ async function handleDeckSave(req: http.IncomingMessage, res: http.ServerRespons
     respondJson(res, 400, { error: 'missing or invalid name' });
     return;
   }
+  const format = url.searchParams.get('format') || 'Standard';
   const body = await readRequestBody(req);
   const cards = parseDecklistText(body);
   if (cards.length === 0) {
     respondJson(res, 400, { error: 'empty or unparseable decklist' });
     return;
   }
-  await saveDeck(userId, name, cards);
-  respondJson(res, 200, toDeckSummaryJson(name, cards));
+  await saveDeck(userId, name, cards, format);
+  respondJson(res, 200, toDeckSummaryJson(name, cards, format));
 }
 
 async function handleDeckDelete(req: http.IncomingMessage, res: http.ServerResponse, shimPath: string): Promise<void> {

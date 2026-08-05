@@ -72,12 +72,20 @@ export async function getDeck(source: 'preset' | 'saved', name: string, token: s
   return res.json();
 }
 
-export async function saveDeck(name: string, cards: DeckCard[], token: string | null): Promise<DeckSummary> {
-  const res = await fetch(`${BASE}/decks/save?name=${encodeURIComponent(name)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain', ...authHeaders(token) },
-    body: toDecklistText(cards),
-  });
+export async function saveDeck(
+  name: string,
+  cards: DeckCard[],
+  format: string,
+  token: string | null,
+): Promise<DeckSummary> {
+  const res = await fetch(
+    `${BASE}/decks/save?name=${encodeURIComponent(name)}&format=${encodeURIComponent(format)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain', ...authHeaders(token) },
+      body: toDecklistText(cards),
+    },
+  );
   if (!res.ok) throw new Error('failed to save deck');
   return res.json();
 }
