@@ -22,6 +22,57 @@ function manaPipClass(label: string): string | null {
   return MANA_PIP_CLASS[label.trim().toLowerCase()] ?? null;
 }
 
+// A double-line hex ring with diamond finials at each vertex — the
+// reference deco kit's signature is concentric strokes + diamond ticks,
+// not a single flat-filled shape.
+const HEX_OUTER: [number, number][] = [
+  [25, 0],
+  [75, 0],
+  [100, 50],
+  [75, 100],
+  [25, 100],
+  [0, 50],
+];
+const HEX_INNER: [number, number][] = HEX_OUTER.map(([x, y]) => [50 + (x - 50) * 0.82, 50 + (y - 50) * 0.82]);
+const toPoints = (pts: [number, number][]) => pts.map(([x, y]) => `${x},${y}`).join(' ');
+
+function LifeBadgeOrnament({ opponent }: { opponent?: boolean }) {
+  const color = opponent ? 'var(--blue-muted)' : 'var(--gold)';
+  return (
+    <svg viewBox="0 0 100 100" className="life-badge-svg" aria-hidden>
+      <polygon points={toPoints(HEX_OUTER)} fill="none" stroke={color} strokeWidth={3} />
+      <polygon points={toPoints(HEX_INNER)} fill="none" stroke={color} strokeWidth={1.5} opacity={0.7} />
+      {HEX_OUTER.map(([x, y], i) => (
+        <rect key={i} x={x - 3} y={y - 3} width={6} height={6} fill={color} transform={`rotate(45 ${x} ${y})`} />
+      ))}
+    </svg>
+  );
+}
+
+// A small diamond-and-hairline corner ornament, reused (with CSS mirroring)
+// at all four corners of the singular chrome panels — prompts/choices are
+// one-off, so real linework earns its keep there without becoming noise.
+function DecoCorner({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) {
+  return (
+    <svg viewBox="0 0 20 20" className={`deco-corner ${position}`} aria-hidden>
+      <rect x="6" y="6" width="8" height="8" fill="var(--gold)" transform="rotate(45 10 10)" />
+      <line x1="10" y1="10" x2="20" y2="10" stroke="var(--gold)" strokeWidth="1.5" />
+      <line x1="10" y1="10" x2="10" y2="20" stroke="var(--gold)" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function DecoCorners() {
+  return (
+    <>
+      <DecoCorner position="tl" />
+      <DecoCorner position="tr" />
+      <DecoCorner position="bl" />
+      <DecoCorner position="br" />
+    </>
+  );
+}
+
 function CardTile({ card, index, onClick }: { card: BoardCard; index: number; onClick?: (index: number) => void }) {
   const showPT = card.power !== 0 || card.toughness !== 0;
   return (
@@ -64,6 +115,7 @@ function PlayerZone({
     <div className={`board-zone${faceDownHand ? ' opponent-zone' : ''}`}>
       <div className="player-row">
         <div className={`life-badge${faceDownHand ? ' opponent' : ''}`}>
+          <LifeBadgeOrnament opponent={faceDownHand} />
           <span className="life-value">{player.life}</span>
         </div>
         <span className="player-name">{player.name}</span>
@@ -119,6 +171,7 @@ function ChoicePanel({
     const valid = Number.isInteger(value) && value >= 0;
     return (
       <div className="choice-panel">
+        <DecoCorners />
         <p className="choice-title">{choice.title}</p>
         <div className="choice-number-row">
           <input type="number" min={0} value={numberValue} onChange={(e) => setNumberValue(e.target.value)} />
@@ -136,6 +189,7 @@ function ChoicePanel({
     const setAmount = (i: number, v: number) => setAmounts((prev) => prev.map((a, idx) => (idx === i ? v : a)));
     return (
       <div className="choice-panel">
+        <DecoCorners />
         <p className="choice-title">
           {choice.attacker} assigns {choice.damage} damage
         </p>
@@ -184,6 +238,7 @@ function ChoicePanel({
 
   return (
     <div className="choice-panel">
+      <DecoCorners />
       <p className="choice-title">{choice.title}</p>
       <div className={allPips ? 'choice-pips' : 'choice-options'}>
         {options.map((label, i) => {
@@ -291,7 +346,7 @@ export default function Board() {
         <button className="refresh-btn" onClick={load}>
           refresh
         </button>
-        <button className="refresh-btn" onClick={() => runAction(api.passPriority)}>
+        <button className="pass-priority-btn" onClick={() => runAction(api.passPriority)}>
           pass priority
         </button>
       </div>
@@ -318,6 +373,7 @@ export default function Board() {
 
       {!choice && prompt?.message && (
         <div className="prompt-panel">
+          <DecoCorners />
           <p className="prompt-message">{prompt.message}</p>
           <div className="prompt-buttons">
             {prompt.button1Enabled && (

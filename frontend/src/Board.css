@@ -23,6 +23,29 @@
   font-size: 0.75rem;
 }
 
+/* Pass priority is the one primary action worth a filled gold tab — every
+   other button in this UI stays a hairline outline so chrome recedes and
+   cards stay the visual focus (see the Polish patch's deco direction). */
+.pass-priority-btn {
+  background: var(--gold);
+  border: none;
+  color: var(--bg);
+  font-weight: 600;
+  padding: 5px 20px;
+  clip-path: polygon(12% 0, 88% 0, 100% 50%, 88% 100%, 12% 100%, 0 50%);
+  box-shadow: inset 0 0 0 2px var(--bg);
+}
+
+.pass-priority-btn::before {
+  content: '◆ ';
+  font-size: 0.7em;
+}
+
+.pass-priority-btn:hover:not(:disabled) {
+  background: var(--text);
+  color: var(--bg);
+}
+
 .board-error {
   text-align: center;
   color: var(--danger);
@@ -50,27 +73,31 @@
   color: var(--text);
 }
 
+/* Hexagonal deco badge — a double-line hex ring with diamond finials at
+   each vertex, matching the reference kit's actual line-art language
+   (concentric strokes + diamond ticks), not a flat filled shape. */
 .life-badge {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--gold);
-  border-radius: 10px;
-  transform: rotate(45deg);
+  width: 46px;
+  height: 46px;
   flex-shrink: 0;
 }
 
+.life-badge-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
 .life-badge .life-value {
-  transform: rotate(-45deg);
+  position: relative;
   font-family: var(--mono);
   font-size: 1rem;
   color: var(--gold);
-}
-
-.life-badge.opponent {
-  border-color: var(--blue-muted);
 }
 
 .life-badge.opponent .life-value {
@@ -92,17 +119,44 @@
   min-height: 84px;
 }
 
+/* A repeated grid (a dozen-plus of these on screen at once) stays plain —
+   full deco framing here would be visual noise, working against the
+   "minimized chrome" direction. One small diamond tick at the corner is
+   enough of a nod to the ornamental language; the real linework treatment
+   is reserved for the singular chrome elements (life badge, panels). */
 .card-tile {
+  position: relative;
   width: 92px;
   height: 76px;
   border: 1px solid var(--blue-mid);
-  border-radius: 8px;
   padding: 6px 8px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   background: var(--bg-panel);
   transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.card-tile::before {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  width: 6px;
+  height: 6px;
+  background: var(--blue-mid);
+  transform: rotate(45deg);
+}
+
+.card-tile.clickable:hover::before {
+  background: var(--gold);
+}
+
+/* Opponent's board recedes — Steel Blue Grey, lower opacity — so the
+   active player's own board stays the primary focus. */
+.opponent-zone .card-tile {
+  border-color: var(--blue-muted);
+  opacity: 0.75;
 }
 
 .card-tile.tapped {
@@ -139,7 +193,6 @@
   width: 60px;
   height: 76px;
   border: 1px solid var(--blue-muted);
-  border-radius: 8px;
   background: repeating-linear-gradient(
     135deg,
     var(--bg-panel),
@@ -153,7 +206,6 @@
   align-self: center;
   min-width: 240px;
   border: 1px solid var(--blue-mid);
-  border-radius: 8px;
   padding: 6px 14px;
   font-family: var(--mono);
   font-size: 0.75rem;
@@ -172,12 +224,13 @@
 }
 
 .prompt-panel {
+  position: relative;
   align-self: center;
   max-width: 520px;
   border: 1px solid var(--gold);
-  border-radius: 10px;
+  box-shadow: inset 0 0 0 4px var(--bg-panel), inset 0 0 0 5px var(--blue-mid);
   background: var(--bg-panel);
-  padding: 12px 18px;
+  padding: 16px 22px;
   text-align: center;
 }
 
@@ -196,14 +249,27 @@
 }
 
 .choice-panel {
+  position: relative;
   align-self: center;
   max-width: 560px;
   border: 1px solid var(--gold);
-  border-radius: 10px;
+  box-shadow: inset 0 0 0 4px var(--bg-panel), inset 0 0 0 5px var(--blue-mid);
   background: var(--bg-panel);
-  padding: 12px 18px;
+  padding: 16px 22px;
   text-align: center;
 }
+
+.deco-corner {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+.deco-corner.tl { top: -1px; left: -1px; }
+.deco-corner.tr { top: -1px; right: -1px; transform: scaleX(-1); }
+.deco-corner.bl { bottom: -1px; left: -1px; transform: scaleY(-1); }
+.deco-corner.br { bottom: -1px; right: -1px; transform: scale(-1, -1); }
 
 .choice-title {
   font-family: var(--mono);
