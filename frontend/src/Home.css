@@ -1,0 +1,41 @@
+.landing-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.landing-signin-hint {
+  margin-top: 16px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.dashboard-deck-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.dashboard-deck-list li {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--blue-mid);
+}
+
+.dashboard-deck-list li:last-child {
+  border-bottom: none;
+}
+
+.dashboard-stat-line {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0 0 8px;
+}
+
+.dashboard-stat-number {
+  font-family: var(--mono);
+  font-size: 1.3rem;
+  color: var(--gold);
+  margin-right: 6px;
+}

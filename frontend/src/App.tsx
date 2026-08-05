@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Home from './Home';
 import Deckbuilder from './Deckbuilder';
 import Board from './Board';
 import { DecoDefs } from './DecoDefs';
@@ -7,15 +8,18 @@ import './App.css';
 
 const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
-type View = 'deckbuilder' | 'board';
+type View = 'home' | 'deckbuilder' | 'board';
 
 function App() {
-  const [view, setView] = useState<View>('deckbuilder');
+  const [view, setView] = useState<View>('home');
 
   return (
     <>
       <DecoDefs />
       <nav className="view-switcher">
+        <button className={view === 'home' ? 'active' : 'ghost'} onClick={() => setView('home')}>
+          Home
+        </button>
         <button
           className={view === 'deckbuilder' ? 'active' : 'ghost'}
           onClick={() => setView('deckbuilder')}
@@ -27,7 +31,9 @@ function App() {
         </button>
         {CLERK_ENABLED && <AuthHeader />}
       </nav>
-      {view === 'deckbuilder' ? <Deckbuilder /> : <Board onExit={() => setView('deckbuilder')} />}
+      {view === 'home' && <Home onNavigate={setView} />}
+      {view === 'deckbuilder' && <Deckbuilder />}
+      {view === 'board' && <Board onExit={() => setView('deckbuilder')} />}
     </>
   );
 }
