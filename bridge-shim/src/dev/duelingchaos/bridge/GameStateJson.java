@@ -4,6 +4,8 @@ import forge.card.CardTypeView;
 import forge.card.MagicColor;
 import forge.card.mana.ManaCost;
 import forge.game.GameEntityView;
+import forge.game.GameLog;
+import forge.game.GameLogEntry;
 import forge.game.GameOutcome;
 import forge.game.GameView;
 import forge.game.card.CardView;
@@ -16,6 +18,7 @@ import forge.game.zone.ZoneType;
 import forge.util.collect.FCollectionView;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 // Minimal hand-rolled JSON writer: the state shape here is small and fixed,
@@ -42,6 +45,7 @@ public final class GameStateJson {
         sb.append("\"pendingChoice\":"); writePendingChoice(sb, gui); sb.append(',');
         sb.append("\"pointers\":"); writePointers(sb, game); sb.append(',');
         sb.append("\"combat\":"); writeCombat(sb, game); sb.append(',');
+        sb.append("\"log\":"); writeGameLog(sb, game); sb.append(',');
 
         sb.append("\"players\":[");
         boolean first = true;
@@ -168,6 +172,30 @@ public final class GameStateJson {
             sb.append('{');
             field(sb, "id", p[0]); sb.append(',');
             field(sb, "message", p[1]);
+            sb.append('}');
+        }
+        sb.append(']');
+    }
+
+    // Forge's own human-readable log (land plays, casts, damage, triggers —
+    // GameLog.add() is called all over the engine with pre-formatted text)
+    // capped to the most recent 100 and reversed newest-first, so opening
+    // the panel shows what just happened without scrolling.
+    private static final int LOG_LIMIT = 100;
+
+    private static void writeGameLog(StringBuilder sb, GameView game) {
+        GameLog log = game.getGameLog();
+        List<GameLogEntry> entries = log == null ? Collections.emptyList() : log.getAllEntries();
+        int from = Math.max(0, entries.size() - LOG_LIMIT);
+        sb.append('[');
+        boolean first = true;
+        for (int i = entries.size() - 1; i >= from; i--) {
+            GameLogEntry e = entries.get(i);
+            if (!first) sb.append(',');
+            first = false;
+            sb.append('{');
+            field(sb, "type", String.valueOf(e.type())); sb.append(',');
+            field(sb, "message", e.message());
             sb.append('}');
         }
         sb.append(']');

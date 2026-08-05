@@ -103,6 +103,9 @@ export type CombatAttacker = { attackerRef: EntityRef; defenderRef: EntityRef | 
 export type CombatBlock = { blockerRef: EntityRef; attackerRef: EntityRef };
 export type CombatState = { attackers: CombatAttacker[]; blocks: CombatBlock[] };
 
+// Newest-first — see GameStateJson.writeGameLog.
+export type GameLogEntry = { type: string; message: string };
+
 export type GameState = {
   turn: number;
   stormCount: number;
@@ -116,6 +119,7 @@ export type GameState = {
   pendingChoice: PendingChoice | null;
   pointers: PointerInfo[];
   combat: CombatState | null;
+  log: GameLogEntry[];
   players: PlayerState[];
   stack: StackItem[];
 };

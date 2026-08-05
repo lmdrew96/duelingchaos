@@ -27,13 +27,19 @@
   color: var(--text-muted);
 }
 
-.board-hud .refresh-btn {
+.board-hud .refresh-btn,
+.board-hud .ghost {
   clip-path: none;
   border-radius: 999px;
   border-color: var(--blue-muted);
   color: var(--text-muted);
   padding: 4px 14px;
   font-size: 0.75rem;
+}
+
+.board-hud .ghost.active {
+  border-color: var(--gold);
+  color: var(--gold);
 }
 
 /* Pass priority is the one primary action worth a filled gold tab — every
@@ -504,6 +510,40 @@
   color: var(--gold);
   text-align: right;
   margin: 12px 0 0;
+}
+
+/* Docked, not a backdrop modal (see GameLogPanel) — sits above the board
+   without dimming or blocking it, so priority/targeting stays clickable
+   while the log is open. */
+.game-log-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 15;
+  width: min(360px, 90vw);
+  max-height: 50vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--gold);
+  box-shadow: inset 0 0 0 4px var(--bg-panel), inset 0 0 0 5px var(--blue-mid), 0 0 26px rgba(237, 202, 55, 0.22);
+  background: var(--bg-panel);
+  padding: 16px 22px;
+}
+
+.game-log-entries {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.game-log-entry {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+
+.game-log-entry:last-child {
+  margin-bottom: 0;
 }
 
 /* Only offered where hover is a real pointer gesture — on touch, the

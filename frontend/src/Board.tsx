@@ -1,6 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as api from './api';
-import type { BoardCard, CardInfo, EntityRef, GameState, PendingChoice, PlayerState, PointerInfo, StackItem } from './types';
+import type {
+  BoardCard,
+  CardInfo,
+  EntityRef,
+  GameLogEntry,
+  GameState,
+  PendingChoice,
+  PlayerState,
+  PointerInfo,
+  StackItem,
+} from './types';
 import { ManaPips } from './manaCost';
 import { CardArt } from './CardArt';
 import { DecoCorners } from './DecoCorner';
@@ -579,6 +589,32 @@ function GraveyardModal({
   );
 }
 
+// Docked panel, not a backdrop modal — unlike CardDetailModal/GraveyardModal,
+// checking the log shouldn't block interacting with the rest of the board
+// (e.g. reading back what a spell did while priority is still live).
+function GameLogPanel({ entries, onClose }: { entries: GameLogEntry[]; onClose: () => void }) {
+  return (
+    <div className="game-log-panel">
+      <DecoCorners />
+      <button type="button" className="ghost card-detail-close" onClick={onClose}>
+        close
+      </button>
+      <p className="choice-title">Game log</p>
+      <div className="game-log-entries">
+        {entries.length === 0 ? (
+          <p className="empty-hint">Nothing logged yet.</p>
+        ) : (
+          entries.map((e, i) => (
+            <p className="game-log-entry" key={i}>
+              {e.message}
+            </p>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Non-blocking, dismissible nudges for legal-but-easy-to-forget options
 // (land drop, an unused instant) — never a rules warning, since Forge
 // enforces those itself. Dismissal is per-instance, not persisted: once the
@@ -658,6 +694,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
   const [hoverCard, setHoverCard] = useState<{ name: string; el: HTMLElement } | null>(null);
   const [graveyardOwnerId, setGraveyardOwnerId] = useState<number | null>(null);
   const [dismissedPointerIds, setDismissedPointerIds] = useState<Set<string>>(new Set());
+  const [logOpen, setLogOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   // Maps "card:<id>" / "player:<id>" to its rendered element — populated by
   // ref callbacks on CardTile/life-badge/stack-tile as they mount, read back
@@ -857,6 +894,9 @@ export default function Board({ onExit }: { onExit: () => void }) {
         <button className="refresh-btn" onClick={load}>
           refresh
         </button>
+        <button className={`ghost${logOpen ? ' active' : ''}`} onClick={() => setLogOpen((o) => !o)}>
+          log
+        </button>
         <button className="ghost" disabled={!state.canUndo} onClick={() => runAction(api.undo)}>
           undo
         </button>
@@ -996,6 +1036,8 @@ export default function Board({ onExit }: { onExit: () => void }) {
       {state.gameOver && (
         <GameOverScreen isDraw={state.isDraw} winnerName={state.winnerName} human={human} onExit={onExit} />
       )}
+
+      {logOpen && <GameLogPanel entries={state.log} onClose={() => setLogOpen(false)} />}
     </div>
   );
 }
