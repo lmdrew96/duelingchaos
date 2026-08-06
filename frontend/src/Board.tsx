@@ -201,6 +201,8 @@ function StackRail({
 // hands over) is often long enough to want a durable, readable view, same
 // deal as CardDetailModal's hover-preview/click-to-pin split for card tiles.
 function StackItemDetailModal({ item, onClose }: { item: StackItem; onClose: () => void }) {
+  const { detail, loading, notFound } = useCardDetail(item.sourceName);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -217,10 +219,20 @@ function StackItemDetailModal({ item, onClose }: { item: StackItem; onClose: () 
         <button type="button" className="ghost card-detail-close" onClick={onClose}>
           close
         </button>
+        {detail && <CardArt name={detail.name} variant="full" className="card-detail-art" />}
         <div className="card-detail-header">
           <span className="card-detail-name">{item.sourceName ?? 'On the stack'}</span>
+          {detail && <ManaPips cost={detail.manaCost} size="md" />}
         </div>
+        {detail && <p className="card-detail-type">{detail.type}</p>}
+        {/* The live resolving description (targets, etc — Forge's own
+            StackItemView.toString()) stays up top since it's the more
+            immediately relevant "what is this doing right now" context;
+            the card's actual oracle text follows below it. */}
         <p className="card-detail-oracle">{item.text}</p>
+        {loading && <p className="choice-hint">Loading oracle text…</p>}
+        {!loading && notFound && <p className="choice-hint">No card data found for "{item.sourceName}".</p>}
+        {detail && detail.oracleText && <p className="card-detail-oracle">{detail.oracleText}</p>}
       </div>
     </div>
   );
@@ -559,12 +571,21 @@ function ChoicePanel({
 // The board only ever knows a card's name/P&T/tapped-state from the live
 // game view — full oracle text/type isn't part of that payload, so this
 // looks the card up through the same /cards/search the deckbuilder uses.
-function CardDetailModal({ cardName, onClose }: { cardName: string; onClose: () => void }) {
+// Shared by CardDetailModal and StackItemDetailModal (a stack item's
+// StackItemView.toString() text is the live resolving description —
+// targets, etc — not the card's own oracle text).
+function useCardDetail(cardName: string | null): { detail: CardInfo | null; loading: boolean; notFound: boolean } {
   const [detail, setDetail] = useState<CardInfo | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(cardName != null);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
+    if (cardName == null) {
+      setDetail(null);
+      setLoading(false);
+      setNotFound(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setDetail(null);
@@ -586,6 +607,12 @@ function CardDetailModal({ cardName, onClose }: { cardName: string; onClose: () 
       cancelled = true;
     };
   }, [cardName]);
+
+  return { detail, loading, notFound };
+}
+
+function CardDetailModal({ cardName, onClose }: { cardName: string; onClose: () => void }) {
+  const { detail, loading, notFound } = useCardDetail(cardName);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
