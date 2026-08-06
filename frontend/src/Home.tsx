@@ -14,6 +14,20 @@ const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
 type View = 'deckbuilder' | 'board';
 
+// Required by the Wizards of the Coast Fan Content Policy for any unofficial
+// project built on Magic: The Gathering IP — see
+// https://company.wizards.com/en/legal/fancontentpolicy. Shown on Home since
+// it's the one view every session passes through.
+function LegalFooter() {
+  return (
+    <p className="legal-footer">
+      DuelingChaos is unofficial Fan Content permitted under the Wizards of the Coast Fan Content Policy. Not
+      approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards
+      of the Coast LLC. Powered by the open-source Forge engine, a separate project unaffiliated with Wizards.
+    </p>
+  );
+}
+
 export default function Home({ onNavigate }: { onNavigate: (view: View) => void }) {
   return CLERK_ENABLED ? (
     <HomeWithAuth onNavigate={onNavigate} />
@@ -87,6 +101,8 @@ function Landing({ onNavigate }: { onNavigate: (view: View) => void }) {
           <p>Sign in to save decks across sessions and keep a running win/loss history for each one.</p>
         </section>
       </div>
+
+      <LegalFooter />
     </div>
   );
 }
@@ -218,6 +234,8 @@ function Dashboard({
           </button>
         </section>
       </div>
+
+      <LegalFooter />
     </div>
   );
 }

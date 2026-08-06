@@ -105,3 +105,14 @@
   color: var(--gold);
   margin-right: 6px;
 }
+
+.legal-footer {
+  max-width: 640px;
+  margin: 32px auto 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--blue-mid);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  text-align: center;
+}
