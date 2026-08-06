@@ -12,6 +12,59 @@ import './Deckbuilder.css';
 
 const CURVE_BUCKETS = 8; // 0,1,2,3,4,5,6,7+
 
+// Display order for grouped deck-list headers — mirrors the convention most
+// deckbuilders use (creatures/planeswalkers first, lands last), not
+// alphabetical. A hybrid type like "Artifact Creature" lands under Creature
+// since that's the card's functional role; 'Other' (e.g. no type resolved
+// yet) always sorts last.
+const CARD_TYPE_GROUPS = [
+  'Creature',
+  'Planeswalker',
+  'Battle',
+  'Instant',
+  'Sorcery',
+  'Artifact',
+  'Enchantment',
+  'Land',
+] as const;
+
+function cardTypeGroup(typeLine: string | undefined): string {
+  if (!typeLine) return 'Other';
+  for (const t of CARD_TYPE_GROUPS) {
+    if (typeLine.includes(t)) return t;
+  }
+  return 'Other';
+}
+
+type DeckSortMode = 'alpha' | 'cmc';
+
+function groupDeckCards(
+  cards: DeckCard[],
+  cardInfoCache: Record<string, CardInfo>,
+  sortMode: DeckSortMode,
+): { group: string; cards: DeckCard[] }[] {
+  const buckets = new Map<string, DeckCard[]>();
+  for (const c of cards) {
+    const group = cardTypeGroup(cardInfoCache[c.name]?.type);
+    (buckets.get(group) ?? buckets.set(group, []).get(group)!).push(c);
+  }
+  const result: { group: string; cards: DeckCard[] }[] = [];
+  for (const group of [...CARD_TYPE_GROUPS, 'Other']) {
+    const list = buckets.get(group);
+    if (!list || list.length === 0) continue;
+    const sorted = [...list].sort((a, b) => {
+      if (sortMode === 'cmc') {
+        const cmcA = manaValue(cardInfoCache[a.name]?.manaCost ?? '');
+        const cmcB = manaValue(cardInfoCache[b.name]?.manaCost ?? '');
+        if (cmcA !== cmcB) return cmcA - cmcB;
+      }
+      return a.name.localeCompare(b.name);
+    });
+    result.push({ group, cards: sorted });
+  }
+  return result;
+}
+
 // Only saved-deck CRUD needs a Clerk session (see src/api.ts /
 // src/db.ts) — everything else (search, presets, legality) stays open.
 // useAuth() throws outside a ClerkProvider, so the hook only ever runs in
@@ -74,6 +127,16 @@ function DeckbuilderCore({
 
   const [decksList, setDecksList] = useState<DecksList>({ presets: [], saved: [], presetFormats: {}, savedFormats: {} });
   const [loadFilter, setLoadFilter] = useState('');
+  const [sortMode, setSortMode] = useState<DeckSortMode>('alpha');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [hoverCard, setHoverCard] = useState<{ name: string; el: HTMLElement } | null>(null);
 
@@ -349,6 +412,33 @@ function DeckbuilderCore({
     </div>
   );
 
+  const renderDeckGroups = (cards: DeckCard[], sectionKey: string) =>
+    groupDeckCards(cards, cardInfoCache, sortMode).map(({ group, cards: groupCards }) => {
+      const key = `${sectionKey}:${group}`;
+      const collapsed = collapsedGroups.has(key);
+      const count = groupCards.reduce((s, c) => s + c.count, 0);
+      return (
+        <div className="deck-group" key={key}>
+          <div
+            className="deck-group-header"
+            role="button"
+            tabIndex={0}
+            onClick={() => toggleGroup(key)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleGroup(key);
+              }
+            }}
+          >
+            <span className={`deck-group-caret${collapsed ? ' collapsed' : ''}`}>▾</span>
+            {group} ({count})
+          </div>
+          {!collapsed && groupCards.map(renderDeckRow)}
+        </div>
+      );
+    });
+
   const filteredPresets = decksList.presets.filter((n) =>
     n.toLowerCase().includes(loadFilter.toLowerCase()),
   );
@@ -430,6 +520,23 @@ function DeckbuilderCore({
             <h2>{deckName || 'Untitled deck'}</h2>
             <span className="deck-size">{deckSize}</span>
           </div>
+          <div className="deck-sort-toggle">
+            <span className="field-label">Sort</span>
+            <button
+              type="button"
+              className={`ghost sort-btn${sortMode === 'alpha' ? ' active' : ''}`}
+              onClick={() => setSortMode('alpha')}
+            >
+              A–Z
+            </button>
+            <button
+              type="button"
+              className={`ghost sort-btn${sortMode === 'cmc' ? ' active' : ''}`}
+              onClick={() => setSortMode('cmc')}
+            >
+              Mana value
+            </button>
+          </div>
           <div className="deck-list">
             {commanderCard && (
               <>
@@ -438,7 +545,7 @@ function DeckbuilderCore({
               </>
             )}
             <p className="deck-section-header">Main deck ({mainCards.reduce((s, c) => s + c.count, 0)})</p>
-            {mainCards.map(renderDeckRow)}
+            {renderDeckGroups(mainCards, 'main')}
             {mainCards.length === 0 && !commanderCard && (
               <p className="empty-hint">Search for cards or load a deck to get started.</p>
             )}
@@ -447,7 +554,7 @@ function DeckbuilderCore({
                 <p className="deck-section-header">
                   Side deck ({sideboardCards.reduce((s, c) => s + c.count, 0)})
                 </p>
-                {sideboardCards.map(renderDeckRow)}
+                {renderDeckGroups(sideboardCards, 'side')}
               </>
             )}
           </div>
