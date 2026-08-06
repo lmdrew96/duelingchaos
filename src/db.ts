@@ -47,6 +47,9 @@ export function ensureSchema(): Promise<void> {
           played_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `;
+      // Existing match_results tables predate the conceded column — ALTER is
+      // the only way a table created before this patch picks it up.
+      await getSql()`ALTER TABLE match_results ADD COLUMN IF NOT EXISTS conceded BOOLEAN NOT NULL DEFAULT false`;
     })();
   }
   return schemaReady;
@@ -111,17 +114,22 @@ export async function recordMatchResult(
   deckName: string,
   won: boolean,
   isDraw: boolean,
+  conceded: boolean,
 ): Promise<void> {
   await ensureSchema();
   await getSql()`
-    INSERT INTO match_results (user_id, deck_name, won, is_draw)
-    VALUES (${userId}, ${deckName}, ${won}, ${isDraw})
+    INSERT INTO match_results (user_id, deck_name, won, is_draw, conceded)
+    VALUES (${userId}, ${deckName}, ${won}, ${isDraw}, ${conceded})
   `;
 }
 
 export type MatchHistoryEntry = { deckName: string; won: boolean; isDraw: boolean; playedAt: string };
 export type MatchStats = { wins: number; losses: number; draws: number; recent: MatchHistoryEntry[] };
 
+// Conceded matches don't reflect a deck's actual performance (the player
+// bailed mid-game, often mid-mulligan or for reasons unrelated to the deck),
+// so they're excluded from both the win/loss/draw record and recent history
+// entirely rather than just uncounted from the totals.
 export async function getMatchStats(userId: string): Promise<MatchStats> {
   await ensureSchema();
   const countRows = (await getSql()`
@@ -129,11 +137,11 @@ export async function getMatchStats(userId: string): Promise<MatchStats> {
       COUNT(*) FILTER (WHERE is_draw) AS draws,
       COUNT(*) FILTER (WHERE won AND NOT is_draw) AS wins,
       COUNT(*) FILTER (WHERE NOT won AND NOT is_draw) AS losses
-    FROM match_results WHERE user_id = ${userId}
+    FROM match_results WHERE user_id = ${userId} AND NOT conceded
   `) as { wins: string; losses: string; draws: string }[];
   const recentRows = (await getSql()`
     SELECT deck_name, won, is_draw, played_at FROM match_results
-    WHERE user_id = ${userId} ORDER BY played_at DESC LIMIT 10
+    WHERE user_id = ${userId} AND NOT conceded ORDER BY played_at DESC LIMIT 10
   `) as { deck_name: string; won: boolean; is_draw: boolean; played_at: string }[];
   const counts = countRows[0];
   return {

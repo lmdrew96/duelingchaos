@@ -114,11 +114,11 @@ export async function startMatch(deckName: string, opponentDeck: string | undefi
 // Fired once by the board when it sees gameOver — no-ops server-side if the
 // running game wasn't started from a saved deck, so this is safe to call
 // unconditionally.
-export async function reportMatchResult(won: boolean, isDraw: boolean): Promise<void> {
+export async function reportMatchResult(won: boolean, isDraw: boolean, conceded: boolean): Promise<void> {
   await fetch(`${BASE}/match/report`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ won, isDraw }),
+    body: JSON.stringify({ won, isDraw, conceded }),
   }).catch(() => undefined);
 }
 

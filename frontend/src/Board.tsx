@@ -804,6 +804,10 @@ export default function Board({ onExit }: { onExit: () => void }) {
   // Board mount — i.e. a new match — gets its own ref via useRef's initial
   // value, so this doesn't need manual resetting).
   const reportedRef = useRef(false);
+  // Set the instant the player clicks concede — read back once gameOver
+  // shows up on the next poll, since the bridge reports a concession as an
+  // ordinary loss with no way to tell the two apart from GameState alone.
+  const concededRef = useRef(false);
 
   const load = () => {
     api
@@ -850,7 +854,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
           reportedRef.current = true;
           const human = s.players.find((p) => !p.isAI) ?? s.players[0];
           const won = !s.isDraw && s.winnerName != null && human != null && s.winnerName === human.name;
-          api.reportMatchResult(won, s.isDraw);
+          api.reportMatchResult(won, s.isDraw, concededRef.current);
           // Next visit to the board should prompt for a fresh matchup
           // instead of re-showing this finished game (see PlayGate/App.tsx).
           clearMatchConfirmed();
@@ -1047,6 +1051,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
           className="concede-btn"
           onClick={() => {
             if (window.confirm('Concede this game? You will lose immediately.')) {
+              concededRef.current = true;
               runAction(api.concede);
             }
           }}

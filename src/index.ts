@@ -367,9 +367,9 @@ async function handleMatchReport(req: http.IncomingMessage, res: http.ServerResp
     return;
   }
   const body = await readRequestBody(req);
-  const { won, isDraw } = JSON.parse(body) as { won: boolean; isDraw: boolean };
+  const { won, isDraw, conceded } = JSON.parse(body) as { won: boolean; isDraw: boolean; conceded: boolean };
   currentMatch.reported = true;
-  await recordMatchResult(currentMatch.userId, currentMatch.deckName, won, isDraw);
+  await recordMatchResult(currentMatch.userId, currentMatch.deckName, won, isDraw, conceded);
   respondJson(res, 200, { recorded: true });
 }
 
