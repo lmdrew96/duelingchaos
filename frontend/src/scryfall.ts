@@ -10,26 +10,34 @@ export type CardArt = { normal: string; artCrop: string } | null;
 const cache = new Map<string, CardArt>();
 const inFlight = new Map<string, Promise<CardArt>>();
 
-// A search result list can be up to 300 distinct cards at once — fetching
-// those one at a time (the previous fully-serialized queue) took minutes.
-// Scryfall's documented limit is ~10 req/s; a small concurrent pool comes
-// in well under that while actually finishing in a few seconds instead of
-// several minutes.
-const CONCURRENCY = 6;
-let active = 0;
-const waiting: (() => void)[] = [];
+// A search result list can be up to 300 distinct cards at once, each
+// mounting a CardArt that requests art immediately. A concurrency-only
+// limiter (N requests in flight, next one fires the instant a slot frees)
+// can still sustain well over Scryfall's documented ~10 req/s under a burst
+// like that — and their rate-limit response apparently omits CORS headers,
+// so a throttled request doesn't fail as a clean "429": the browser reports
+// it as a CORS error (see the ChaosPatch "console errors" report — hundreds
+// of "blocked by CORS policy" lines, one per card, from exactly this path).
+// Pacing request *starts* to one every MIN_INTERVAL_MS keeps us under the
+// limit regardless of how many cards are queued at once.
+const MIN_INTERVAL_MS = 100; // ~10 req/s, matching Scryfall's documented limit
+let lastRequestAt = 0;
+let queue: Promise<void> = Promise.resolve();
 
-async function withSlot<T>(fn: () => Promise<T>): Promise<T> {
-  if (active >= CONCURRENCY) {
-    await new Promise<void>((resolve) => waiting.push(resolve));
-  }
-  active++;
-  try {
-    return await fn();
-  } finally {
-    active--;
-    waiting.shift()?.();
-  }
+function scheduleFetch<T>(fn: () => Promise<T>): Promise<T> {
+  const result = queue.then(async () => {
+    const wait = Math.max(0, lastRequestAt + MIN_INTERVAL_MS - Date.now());
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    lastRequestAt = Date.now();
+    return fn();
+  });
+  // Keep the queue alive even if this fetch fails — fetchArt already
+  // swallows its own errors, but nothing else should ever back up behind it.
+  queue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
 }
 
 function imageUrisOf(card: any): { normal?: string; art_crop?: string } | undefined {
@@ -56,7 +64,7 @@ export function getCardArt(name: string): Promise<CardArt> {
   const pending = inFlight.get(key);
   if (pending) return pending;
 
-  const result = withSlot(() => fetchArt(name)).then((art) => {
+  const result = scheduleFetch(() => fetchArt(name)).then((art) => {
     cache.set(key, art);
     inFlight.delete(key);
     return art;
