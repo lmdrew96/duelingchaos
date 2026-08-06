@@ -268,6 +268,23 @@ function DeckbuilderCore({
     [...colorIdentity].every((c) => commanderIdentity.includes(c));
   const visibleSearchResults = searchResults.filter((c) => withinCommanderIdentity(c.colorIdentity));
 
+  // Same inclusion rule as the curve buckets below (main + commander,
+  // lands excluded) but off the real manaValue rather than the
+  // bucketed/capped index, so a heavy top end (several 7+ CMC cards) isn't
+  // flattened into "7" the way the last curve bucket is.
+  const avgManaCost = useMemo(() => {
+    let totalCmc = 0;
+    let totalCount = 0;
+    for (const dc of deckCards) {
+      if (dc.section === 'sideboard') continue;
+      const info = cardInfoCache[dc.name];
+      if (!info || info.type.includes('Land')) continue;
+      totalCmc += manaValue(info.manaCost) * dc.count;
+      totalCount += dc.count;
+    }
+    return totalCount > 0 ? totalCmc / totalCount : 0;
+  }, [deckCards, cardInfoCache]);
+
   const manaCurve = useMemo(() => {
     const buckets = new Array(CURVE_BUCKETS).fill(0);
     for (const dc of deckCards) {
@@ -600,7 +617,7 @@ function DeckbuilderCore({
           </div>
 
           {deckCards.length > 0 && (
-            <DeckStats manaCurve={manaCurve} colorCounts={colorCounts} expanded={expandedStats} />
+            <DeckStats manaCurve={manaCurve} avgManaCost={avgManaCost} colorCounts={colorCounts} expanded={expandedStats} />
           )}
         </section>
 

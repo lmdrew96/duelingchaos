@@ -13,6 +13,7 @@ const COLOR_LABEL: Record<(typeof COLOR_ORDER)[number], string> = {
 
 type DeckStatsProps = {
   manaCurve: number[];
+  avgManaCost: number;
   colorCounts: Record<string, number>;
   expanded: ExpandedDeckStats;
 };
@@ -20,7 +21,7 @@ type DeckStatsProps = {
 // Mana curve (bucketed by CMC, lands excluded) and color balance (spell
 // count per color, lands excluded) for the deck currently being built.
 // Numbers come pre-computed from Deckbuilder — this is presentation only.
-export function DeckStats({ manaCurve, colorCounts, expanded }: DeckStatsProps) {
+export function DeckStats({ manaCurve, avgManaCost, colorCounts, expanded }: DeckStatsProps) {
   const maxCurve = Math.max(1, ...manaCurve);
   const maxColor = Math.max(1, ...COLOR_ORDER.map((c) => colorCounts[c] ?? 0));
   const maxBalance = Math.max(1, ...expanded.manaBalance.flatMap((b) => [b.pips, b.sources]));
@@ -30,6 +31,11 @@ export function DeckStats({ manaCurve, colorCounts, expanded }: DeckStatsProps) 
   return (
     <div className="deck-stats">
       <h2 style={{ marginTop: 20 }}>Mana curve</h2>
+      {manaCurve.some((c) => c > 0) && (
+        <p className="empty-hint">
+          Average mana value: <span className="stats-number">{avgManaCost.toFixed(2)}</span>
+        </p>
+      )}
       <div className="curve-chart">
         {manaCurve.map((count, cmc) => (
           <div className="curve-col" key={cmc}>
