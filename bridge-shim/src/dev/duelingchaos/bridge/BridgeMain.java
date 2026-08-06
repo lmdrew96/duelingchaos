@@ -50,7 +50,7 @@ public class BridgeMain {
 
     public static void main(String[] args) throws IOException {
         if (args.length < 2) {
-            System.err.println("Usage: BridgeMain <deck1.dck> <deck2.dck> [port] [preconsDir]");
+            System.err.println("Usage: BridgeMain <deck1.dck> <deck2.dck> [port] [preconsDir] [aiProfile]");
             System.exit(1);
         }
 
@@ -66,6 +66,7 @@ public class BridgeMain {
 
         int port = args.length > 2 ? Integer.parseInt(args[2]) : 8787;
         File preconsDir = args.length > 3 ? new File(args[3]) : new File("res/quest/precons");
+        String aiProfile = args.length > 4 && !args[4].isEmpty() ? args[4] : null;
 
         // Hardcoding Constructed here meant a deck's [Commander] section
         // never actually seeded a command zone at runtime — Forge only
@@ -91,7 +92,9 @@ public class BridgeMain {
         rpHuman.setPlayer(new LobbyPlayerHuman("You"));
         RegisteredPlayer rpAi = aiDeck.has(DeckSection.Commander)
             ? RegisteredPlayer.forCommander(aiDeck) : new RegisteredPlayer(aiDeck);
-        rpAi.setPlayer(GamePlayerUtil.createAiPlayer(aiDeck.getName(), 1));
+        rpAi.setPlayer(aiProfile != null
+            ? GamePlayerUtil.createAiPlayer(aiDeck.getName(), aiProfile)
+            : GamePlayerUtil.createAiPlayer(aiDeck.getName(), 1));
 
         List<RegisteredPlayer> players = new ArrayList<>();
         players.add(rpHuman);

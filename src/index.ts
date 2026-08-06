@@ -34,6 +34,12 @@ const PRESETS_DIR = path.join(PROJECT_ROOT, 'res', 'presets');
 const JAVA_PORT = 8787;
 const HTTP_PORT = Number(process.env.PORT) || 4310;
 
+// Forge's bundled AI personality profiles — res/ai/*.ai on disk, passed
+// straight through to GamePlayerUtil.createAiPlayer(name, profile) in
+// BridgeMain. No bridge endpoint enumerates these; the set is small and
+// fixed, so it's just hardcoded here and in the frontend's picker.
+const AI_PROFILES = ['Cautious', 'Default', 'Experimental', 'Reckless'];
+
 // Phase 1/2 spike decks — default boot pairing, also the fixed AI opponent
 // for a match started from a saved deck (see startMatch).
 const DECK1 = 'res/quest/precons/Gruul Goliaths.dck';
@@ -49,14 +55,12 @@ let forgeProcess: ChildProcessWithoutNullStreams | null = null;
 // boot pairing, which isn't tied to a saved deck or a signed-in user.
 let currentMatch: { userId: string; deckName: string; reported: boolean } | null = null;
 
-function startForgeShim(deck1: string, deck2: string): Promise<ChildProcessWithoutNullStreams> {
+function startForgeShim(deck1: string, deck2: string, aiProfile?: string): Promise<ChildProcessWithoutNullStreams> {
   return new Promise((resolve, reject) => {
     const classpath = `${FORGE_JAR}:${SHIM_BUILD_DIR}`;
-    const child = spawn(
-      'java',
-      ['-cp', classpath, 'dev.duelingchaos.bridge.BridgeMain', deck1, deck2, String(JAVA_PORT), PRESETS_DIR],
-      { cwd: FORGE_DIR },
-    );
+    const args = ['-cp', classpath, 'dev.duelingchaos.bridge.BridgeMain', deck1, deck2, String(JAVA_PORT), PRESETS_DIR];
+    if (aiProfile) args.push(aiProfile);
+    const child = spawn('java', args, { cwd: FORGE_DIR });
 
     let resolved = false;
     child.stdout.on('data', (chunk: Buffer) => {
@@ -83,7 +87,7 @@ function startForgeShim(deck1: string, deck2: string): Promise<ChildProcessWitho
 // race the old one for the port. Any in-flight request during this window
 // gets the existing "Forge shim unreachable" 502 from proxyToShim, which the
 // board already renders as a retry-able error.
-async function restartMatch(deck1: string, deck2: string): Promise<void> {
+async function restartMatch(deck1: string, deck2: string, aiProfile?: string): Promise<void> {
   if (forgeProcess) {
     const dying = forgeProcess;
     await new Promise<void>((resolve) => {
@@ -91,7 +95,7 @@ async function restartMatch(deck1: string, deck2: string): Promise<void> {
       dying.kill();
     });
   }
-  forgeProcess = await startForgeShim(deck1, deck2);
+  forgeProcess = await startForgeShim(deck1, deck2, aiProfile);
 }
 
 // Forge has no classes reachable from Node to serialize a real .dck file, so
@@ -330,16 +334,22 @@ async function handleMatchStart(req: http.IncomingMessage, res: http.ServerRespo
   const body = await readRequestBody(req);
   let deckName: string | undefined;
   let opponentDeck: string | undefined;
+  let aiProfile: string | undefined;
   try {
-    const parsed = JSON.parse(body) as { deckName?: string; opponentDeck?: string };
+    const parsed = JSON.parse(body) as { deckName?: string; opponentDeck?: string; aiProfile?: string };
     deckName = parsed.deckName;
     opponentDeck = parsed.opponentDeck;
+    aiProfile = parsed.aiProfile;
   } catch {
     respondJson(res, 400, { error: 'invalid JSON body' });
     return;
   }
   if (!deckName) {
     respondJson(res, 400, { error: 'missing deckName' });
+    return;
+  }
+  if (aiProfile && !AI_PROFILES.includes(aiProfile)) {
+    respondJson(res, 400, { error: `unknown aiProfile: ${aiProfile}` });
     return;
   }
   const deck = await getSavedDeck(userId, deckName);
@@ -355,7 +365,7 @@ async function handleMatchStart(req: http.IncomingMessage, res: http.ServerRespo
     return;
   }
   const humanDeckPath = writeHumanDecklist(deck.cards);
-  await restartMatch(humanDeckPath, opponentDeckPath);
+  await restartMatch(humanDeckPath, opponentDeckPath, aiProfile);
   currentMatch = { userId, deckName, reported: false };
   respondJson(res, 200, { ok: true });
 }

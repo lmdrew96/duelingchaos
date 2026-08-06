@@ -106,11 +106,16 @@ export async function deleteDeck(name: string, token: string | null): Promise<vo
 // of the presets at random server-side) — resolves once the new game is
 // actually ready to poll (see src/index.ts's restartMatch), so the caller
 // can navigate to the board immediately after.
-export async function startMatch(deckName: string, opponentDeck: string | undefined, token: string | null): Promise<void> {
+export async function startMatch(
+  deckName: string,
+  opponentDeck: string | undefined,
+  token: string | null,
+  aiProfile?: string,
+): Promise<void> {
   const res = await fetch(`${BASE}/match/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-    body: JSON.stringify({ deckName, opponentDeck }),
+    body: JSON.stringify({ deckName, opponentDeck, aiProfile }),
   });
   if (!res.ok) throw new Error('failed to start match');
 }

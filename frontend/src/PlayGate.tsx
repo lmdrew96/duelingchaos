@@ -14,6 +14,11 @@ import './Board.css';
 
 const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
+// Forge's bundled AI personality profiles (res/ai/*.ai) — mirrors the
+// hardcoded list in src/index.ts's AI_PROFILES; no bridge endpoint
+// enumerates these since the set is small and fixed.
+const AI_PROFILES = ['Default', 'Cautious', 'Experimental', 'Reckless'];
+
 // Whether *this browser tab* already picked decks (or explicitly chose to
 // skip picking) for the match currently running server-side — sessionStorage
 // rather than component state so a page refresh mid-game resumes straight
@@ -106,6 +111,7 @@ function PlayGateCore({
   const [decksList, setDecksList] = useState<DecksList>({ presets: [], saved: [], presetFormats: {}, savedFormats: {} });
   const [deckName, setDeckName] = useState('');
   const [opponentDeck, setOpponentDeck] = useState('random');
+  const [aiProfile, setAiProfile] = useState('Default');
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aiWarningCards, setAiWarningCards] = useState<string[]>([]);
@@ -155,7 +161,7 @@ function PlayGateCore({
     setError(null);
     try {
       const token = await getToken();
-      await api.startMatch(deckName, opponentDeck === 'random' ? undefined : opponentDeck, token);
+      await api.startMatch(deckName, opponentDeck === 'random' ? undefined : opponentDeck, token, aiProfile);
       markMatchConfirmed();
       onConfirmed();
     } catch {
@@ -235,6 +241,20 @@ function PlayGateCore({
                 No preset opponents are legal in {playerFormat} — a random deck will still be picked from all presets.
               </p>
             )}
+            <span className="field-label" style={{ marginTop: 12 }}>
+              AI personality
+            </span>
+            <select
+              className="format-select"
+              value={aiProfile}
+              onChange={(e) => setAiProfile(e.target.value)}
+            >
+              {AI_PROFILES.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
             {aiWarningCards.length > 0 && (
               <p className="empty-hint" style={{ marginTop: 4 }}>
                 {aiWarningCards.length} card{aiWarningCards.length === 1 ? '' : 's'} in this precon the AI plays badly.
