@@ -10,10 +10,27 @@ export type CardArt = { normal: string; artCrop: string } | null;
 const cache = new Map<string, CardArt>();
 const inFlight = new Map<string, Promise<CardArt>>();
 
-// Scryfall asks clients to space out requests (~50-100ms) rather than
-// burst — a simple serialized queue is enough for a single local game's
-// worth of distinct card names.
-let queue: Promise<void> = Promise.resolve();
+// A search result list can be up to 300 distinct cards at once — fetching
+// those one at a time (the previous fully-serialized queue) took minutes.
+// Scryfall's documented limit is ~10 req/s; a small concurrent pool comes
+// in well under that while actually finishing in a few seconds instead of
+// several minutes.
+const CONCURRENCY = 6;
+let active = 0;
+const waiting: (() => void)[] = [];
+
+async function withSlot<T>(fn: () => Promise<T>): Promise<T> {
+  if (active >= CONCURRENCY) {
+    await new Promise<void>((resolve) => waiting.push(resolve));
+  }
+  active++;
+  try {
+    return await fn();
+  } finally {
+    active--;
+    waiting.shift()?.();
+  }
+}
 
 function imageUrisOf(card: any): { normal?: string; art_crop?: string } | undefined {
   return card.image_uris ?? card.card_faces?.[0]?.image_uris;
@@ -39,12 +56,7 @@ export function getCardArt(name: string): Promise<CardArt> {
   const pending = inFlight.get(key);
   if (pending) return pending;
 
-  const run = queue.then(() => new Promise<void>((resolve) => setTimeout(resolve, 100))).then(() => fetchArt(name));
-  queue = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  const result = run.then((art) => {
+  const result = withSlot(() => fetchArt(name)).then((art) => {
     cache.set(key, art);
     inFlight.delete(key);
     return art;
