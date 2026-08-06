@@ -43,10 +43,24 @@ function landColorSources(oracleText: string): string[] {
 // make, not a precise parser for every Forge oracle-text edge case.
 const TOKEN_CREATE_RE = /create[s]?\s+(?:an?|one|two|three|four|five|six|x|\d+)\s+([a-z0-9/\-\s]*?token[s]?)(?=[.,;]|$)/gi;
 
+// Different cards phrase the same token differently — "a 1/1 green Squirrel
+// creature token" vs "two 1/1 green Squirrel creature tokens" vs "a tapped
+// 1/1 green Squirrel creature token" — so the raw capture needs normalizing
+// before it's used as a dedup key, or the same token shows up several times
+// in the list. "Tapped"/"attacking" describe how the token enters, not what
+// it is, and singular/plural is just grammar, so both get stripped.
+function normalizeTokenDescription(desc: string): string {
+  return desc
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^(tapped|attacking)\s+/i, '')
+    .replace(/tokens?$/i, 'token');
+}
+
 function extractTokenTypes(oracleText: string): string[] {
   const found: string[] = [];
   for (const m of oracleText.matchAll(TOKEN_CREATE_RE)) {
-    const desc = m[1].replace(/\s+/g, ' ').trim();
+    const desc = normalizeTokenDescription(m[1]);
     if (desc) found.push(desc);
   }
   return found;
