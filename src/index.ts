@@ -288,16 +288,24 @@ async function handleDeckDelete(req: http.IncomingMessage, res: http.ServerRespo
 // DeckboxHandlers.preconDir); /decks/list already reports their names. This
 // resolves a player's opponent choice from handleMatchStart into a concrete
 // .dck path the shim can boot with — 'random'/undefined picks one of the
-// current presets uniformly at random. An absolute path, since BridgeMain
-// runs with cwd=FORGE_DIR while PRESETS_DIR lives at the project root.
-async function resolveOpponentDeckPath(preferredName: string | undefined): Promise<string> {
-  const { presets } = (await fetchShimJson('/decks/list')) as { presets: string[] };
+// current presets uniformly at random, restricted to presets legal in the
+// player's deck format when any such preset exists (falls back to the full
+// pool only if none match, mirroring the hint text in PlayGate). An
+// absolute path, since BridgeMain runs with cwd=FORGE_DIR while
+// PRESETS_DIR lives at the project root.
+async function resolveOpponentDeckPath(preferredName: string | undefined, playerFormat: string): Promise<string> {
+  const { presets, presetFormats } = (await fetchShimJson('/decks/list')) as {
+    presets: string[];
+    presetFormats: Record<string, string[]>;
+  };
   if (presets.length === 0) {
     return DECK2;
   }
   let name = preferredName;
   if (!name || name === 'random') {
-    name = presets[Math.floor(Math.random() * presets.length)];
+    const formatLegal = presets.filter((p) => presetFormats[p]?.includes(playerFormat));
+    const pool = formatLegal.length > 0 ? formatLegal : presets;
+    name = pool[Math.floor(Math.random() * pool.length)];
   } else if (!presets.includes(name)) {
     throw new Error(`unknown opponent deck: ${name}`);
   }
@@ -341,7 +349,7 @@ async function handleMatchStart(req: http.IncomingMessage, res: http.ServerRespo
   }
   let opponentDeckPath: string;
   try {
-    opponentDeckPath = await resolveOpponentDeckPath(opponentDeck);
+    opponentDeckPath = await resolveOpponentDeckPath(opponentDeck, deck.format);
   } catch (err) {
     respondJson(res, 400, { error: (err as Error).message });
     return;
