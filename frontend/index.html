@@ -5,6 +5,17 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>DuelingChaos — Deckbuilder</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Jost (body) and Space Mono (labels/stats) — picked to coordinate with
+         the self-hosted Arabic Calligraphy display font (see index.css's
+         @font-face): a geometric Deco-era sans and a geometric mono, both
+         reading as part of the same "Arabic-deco" family as the calligraphic
+         headings instead of a generic system-font body. -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
     <script>
       // Runs before first paint so the page never flashes the wrong theme —
       // src/theme.ts's useTheme takes over (and keeps this in sync) once

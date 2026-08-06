@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Arabic Calligraphy';
+  src: url('/assets/fonts/ArabicCalligraphy.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* Arabic-deco palette — see the "Polish" ChaosPatch for the full phase-5
      visual direction. This deckbuilder screen only borrows the palette and
@@ -14,9 +22,9 @@
   --danger: #d9765a;
   --ok: #7fbf7f;
 
-  --sans: 'Space Grotesk', system-ui, sans-serif;
-  --mono: 'Geist Mono', ui-monospace, Consolas, monospace;
-  --serif: 'Cormorant Garamond', Cormorant, Garamond, 'Times New Roman', serif;
+  --sans: 'Jost', system-ui, sans-serif;
+  --mono: 'Space Mono', ui-monospace, Consolas, monospace;
+  --serif: 'Arabic Calligraphy', 'Cormorant Garamond', Cormorant, Garamond, 'Times New Roman', serif;
 
   font: 16px/1.5 var(--sans);
   color-scheme: dark;
