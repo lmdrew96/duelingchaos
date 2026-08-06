@@ -104,7 +104,7 @@ function PlayGateCore({
       </header>
       <DecoRule />
 
-      <section className="panel" style={{ marginTop: 20, maxWidth: 480 }}>
+      <section className="panel" style={{ margin: '20px auto 0', maxWidth: 480 }}>
         <DecoCorners />
         {!isSignedIn ? (
           <>
