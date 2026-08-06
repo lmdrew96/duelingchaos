@@ -112,6 +112,7 @@ function PlayGateCore({
   const [deckName, setDeckName] = useState('');
   const [opponentDeck, setOpponentDeck] = useState('random');
   const [aiProfile, setAiProfile] = useState('Default');
+  const [momirMode, setMomirMode] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aiWarningCards, setAiWarningCards] = useState<string[]>([]);
@@ -161,17 +162,27 @@ function PlayGateCore({
     setError(null);
     try {
       const token = await getToken();
-      await api.startMatch(deckName, opponentDeck === 'random' ? undefined : opponentDeck, token, aiProfile);
+      await api.startMatch(
+        deckName,
+        opponentDeck === 'random' ? undefined : opponentDeck,
+        token,
+        aiProfile,
+        momirMode ? 'momir' : undefined,
+      );
       markMatchConfirmed();
       onConfirmed();
     } catch {
-      setError('Could not start a match with that deck.');
+      setError('Could not start a match.');
     } finally {
       setStarting(false);
     }
   };
 
   const handleStart = () => {
+    if (momirMode) {
+      doStart();
+      return;
+    }
     if (!deckName) return;
     if (aiWarningCards.length > 0) {
       setShowAiWarning(true);
@@ -204,71 +215,109 @@ function PlayGateCore({
               Continue to the current game
             </button>
           </>
-        ) : decksList.saved.length === 0 ? (
-          <>
-            <p className="empty-hint">No saved decks yet — build one first.</p>
-            <button className="ghost" onClick={handleSkip}>
-              Continue to the current game
-            </button>
-          </>
         ) : (
           <>
-            <span className="field-label">Your deck</span>
-            <select className="format-select" value={deckName} onChange={(e) => setDeckName(e.target.value)}>
-              {decksList.saved.map((name) => (
-                <option key={name} value={name}>
-                  {name} — {decksList.savedFormats[name] ?? 'Standard'}
-                </option>
-              ))}
-            </select>
-            <span className="field-label" style={{ marginTop: 12 }}>
-              Opponent deck
-            </span>
-            <select
-              className="format-select"
-              value={opponentDeck}
-              onChange={(e) => setOpponentDeck(e.target.value)}
-            >
-              <option value="random">Random</option>
-              {opponentOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            {opponentOptions.length === 0 && (
-              <p className="empty-hint" style={{ marginTop: 4 }}>
-                No preset opponents are legal in {playerFormat} — a random deck will still be picked from all presets.
-              </p>
+            <label className="field-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" checked={momirMode} onChange={(e) => setMomirMode(e.target.checked)} />
+              Momir Basic (chaos mode — cast random creatures off a basics-only library, no deckbuilding)
+            </label>
+            {momirMode ? (
+              <>
+                <span className="field-label" style={{ marginTop: 12 }}>
+                  AI personality
+                </span>
+                <select
+                  className="format-select"
+                  value={aiProfile}
+                  onChange={(e) => setAiProfile(e.target.value)}
+                >
+                  {AI_PROFILES.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <div className="save-row" style={{ marginTop: 16 }}>
+                  <button disabled={starting} onClick={handleStart}>
+                    {starting ? 'Starting…' : 'Start match'}
+                  </button>
+                  <button className="ghost" onClick={handleSkip}>
+                    Continue to the current game
+                  </button>
+                </div>
+                {error && <p className="status-message">{error}</p>}
+              </>
+            ) : decksList.saved.length === 0 ? (
+              <>
+                <p className="empty-hint" style={{ marginTop: 12 }}>
+                  No saved decks yet — build one first.
+                </p>
+                <button className="ghost" onClick={handleSkip}>
+                  Continue to the current game
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="field-label" style={{ marginTop: 12 }}>
+                  Your deck
+                </span>
+                <select className="format-select" value={deckName} onChange={(e) => setDeckName(e.target.value)}>
+                  {decksList.saved.map((name) => (
+                    <option key={name} value={name}>
+                      {name} — {decksList.savedFormats[name] ?? 'Standard'}
+                    </option>
+                  ))}
+                </select>
+                <span className="field-label" style={{ marginTop: 12 }}>
+                  Opponent deck
+                </span>
+                <select
+                  className="format-select"
+                  value={opponentDeck}
+                  onChange={(e) => setOpponentDeck(e.target.value)}
+                >
+                  <option value="random">Random</option>
+                  {opponentOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                {opponentOptions.length === 0 && (
+                  <p className="empty-hint" style={{ marginTop: 4 }}>
+                    No preset opponents are legal in {playerFormat} — a random deck will still be picked from all presets.
+                  </p>
+                )}
+                <span className="field-label" style={{ marginTop: 12 }}>
+                  AI personality
+                </span>
+                <select
+                  className="format-select"
+                  value={aiProfile}
+                  onChange={(e) => setAiProfile(e.target.value)}
+                >
+                  {AI_PROFILES.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                {aiWarningCards.length > 0 && (
+                  <p className="empty-hint" style={{ marginTop: 4 }}>
+                    {aiWarningCards.length} card{aiWarningCards.length === 1 ? '' : 's'} in this precon the AI plays badly.
+                  </p>
+                )}
+                <div className="save-row" style={{ marginTop: 16 }}>
+                  <button disabled={starting} onClick={handleStart}>
+                    {starting ? 'Starting…' : 'Start match'}
+                  </button>
+                  <button className="ghost" onClick={handleSkip}>
+                    Continue to the current game
+                  </button>
+                </div>
+                {error && <p className="status-message">{error}</p>}
+              </>
             )}
-            <span className="field-label" style={{ marginTop: 12 }}>
-              AI personality
-            </span>
-            <select
-              className="format-select"
-              value={aiProfile}
-              onChange={(e) => setAiProfile(e.target.value)}
-            >
-              {AI_PROFILES.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            {aiWarningCards.length > 0 && (
-              <p className="empty-hint" style={{ marginTop: 4 }}>
-                {aiWarningCards.length} card{aiWarningCards.length === 1 ? '' : 's'} in this precon the AI plays badly.
-              </p>
-            )}
-            <div className="save-row" style={{ marginTop: 16 }}>
-              <button disabled={starting} onClick={handleStart}>
-                {starting ? 'Starting…' : 'Start match'}
-              </button>
-              <button className="ghost" onClick={handleSkip}>
-                Continue to the current game
-              </button>
-            </div>
-            {error && <p className="status-message">{error}</p>}
           </>
         )}
       </section>

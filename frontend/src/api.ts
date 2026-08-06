@@ -111,11 +111,12 @@ export async function startMatch(
   opponentDeck: string | undefined,
   token: string | null,
   aiProfile?: string,
+  gameMode?: string,
 ): Promise<void> {
   const res = await fetch(`${BASE}/match/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-    body: JSON.stringify({ deckName, opponentDeck, aiProfile }),
+    body: JSON.stringify({ deckName, opponentDeck, aiProfile, gameMode }),
   });
   if (!res.ok) throw new Error('failed to start match');
 }

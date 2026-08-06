@@ -40,6 +40,12 @@ const HTTP_PORT = Number(process.env.PORT) || 4310;
 // fixed, so it's just hardcoded here and in the frontend's picker.
 const AI_PROFILES = ['Cautious', 'Default', 'Experimental', 'Reckless'];
 
+// 'momir' skips deck selection entirely — BridgeMain auto-generates both
+// seats' decks (60x basics + the Momir Vig avatar) instead of loading
+// deckName/opponentDeck. Recorded under this sentinel deckName so match
+// history/stats still have something to group on.
+const MOMIR_DECK_NAME = 'Momir Basic';
+
 // Phase 1/2 spike decks — default boot pairing, also the fixed AI opponent
 // for a match started from a saved deck (see startMatch).
 const DECK1 = 'res/quest/precons/Gruul Goliaths.dck';
@@ -55,11 +61,22 @@ let forgeProcess: ChildProcessWithoutNullStreams | null = null;
 // boot pairing, which isn't tied to a saved deck or a signed-in user.
 let currentMatch: { userId: string; deckName: string; reported: boolean } | null = null;
 
-function startForgeShim(deck1: string, deck2: string, aiProfile?: string): Promise<ChildProcessWithoutNullStreams> {
+function startForgeShim(
+  deck1: string,
+  deck2: string,
+  aiProfile?: string,
+  gameMode?: string,
+): Promise<ChildProcessWithoutNullStreams> {
   return new Promise((resolve, reject) => {
     const classpath = `${FORGE_JAR}:${SHIM_BUILD_DIR}`;
     const args = ['-cp', classpath, 'dev.duelingchaos.bridge.BridgeMain', deck1, deck2, String(JAVA_PORT), PRESETS_DIR];
-    if (aiProfile) args.push(aiProfile);
+    // Positional CLI args on the Java side — gameMode needs the aiProfile
+    // slot filled (even if empty) to land at the right index.
+    if (gameMode) {
+      args.push(aiProfile ?? '', gameMode);
+    } else if (aiProfile) {
+      args.push(aiProfile);
+    }
     const child = spawn('java', args, { cwd: FORGE_DIR });
 
     let resolved = false;
@@ -87,7 +104,7 @@ function startForgeShim(deck1: string, deck2: string, aiProfile?: string): Promi
 // race the old one for the port. Any in-flight request during this window
 // gets the existing "Forge shim unreachable" 502 from proxyToShim, which the
 // board already renders as a retry-able error.
-async function restartMatch(deck1: string, deck2: string, aiProfile?: string): Promise<void> {
+async function restartMatch(deck1: string, deck2: string, aiProfile?: string, gameMode?: string): Promise<void> {
   if (forgeProcess) {
     const dying = forgeProcess;
     await new Promise<void>((resolve) => {
@@ -95,7 +112,7 @@ async function restartMatch(deck1: string, deck2: string, aiProfile?: string): P
       dying.kill();
     });
   }
-  forgeProcess = await startForgeShim(deck1, deck2, aiProfile);
+  forgeProcess = await startForgeShim(deck1, deck2, aiProfile, gameMode);
 }
 
 // Forge has no classes reachable from Node to serialize a real .dck file, so
@@ -335,21 +352,40 @@ async function handleMatchStart(req: http.IncomingMessage, res: http.ServerRespo
   let deckName: string | undefined;
   let opponentDeck: string | undefined;
   let aiProfile: string | undefined;
+  let gameMode: string | undefined;
   try {
-    const parsed = JSON.parse(body) as { deckName?: string; opponentDeck?: string; aiProfile?: string };
+    const parsed = JSON.parse(body) as {
+      deckName?: string;
+      opponentDeck?: string;
+      aiProfile?: string;
+      gameMode?: string;
+    };
     deckName = parsed.deckName;
     opponentDeck = parsed.opponentDeck;
     aiProfile = parsed.aiProfile;
+    gameMode = parsed.gameMode;
   } catch {
     respondJson(res, 400, { error: 'invalid JSON body' });
     return;
   }
-  if (!deckName) {
-    respondJson(res, 400, { error: 'missing deckName' });
-    return;
-  }
   if (aiProfile && !AI_PROFILES.includes(aiProfile)) {
     respondJson(res, 400, { error: `unknown aiProfile: ${aiProfile}` });
+    return;
+  }
+  if (gameMode && gameMode !== 'momir') {
+    respondJson(res, 400, { error: `unknown gameMode: ${gameMode}` });
+    return;
+  }
+
+  if (gameMode === 'momir') {
+    await restartMatch('', '', aiProfile, gameMode);
+    currentMatch = { userId, deckName: MOMIR_DECK_NAME, reported: false };
+    respondJson(res, 200, { ok: true });
+    return;
+  }
+
+  if (!deckName) {
+    respondJson(res, 400, { error: 'missing deckName' });
     return;
   }
   const deck = await getSavedDeck(userId, deckName);
