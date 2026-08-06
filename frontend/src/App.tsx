@@ -49,18 +49,21 @@ function App() {
     <div className="app-root">
       <DecoDefs />
       <nav className="view-switcher">
-        <button className={view === 'home' ? 'active' : 'ghost'} onClick={() => setView('home')}>
-          Home
-        </button>
-        <button
-          className={view === 'deckbuilder' ? 'active' : 'ghost'}
-          onClick={() => setView('deckbuilder')}
-        >
-          Deckbuilder
-        </button>
-        <button className={view === 'board' ? 'active' : 'ghost'} onClick={() => setView('board')}>
-          Board
-        </button>
+        <div className="nav-links">
+          <button className={view === 'home' ? 'active' : 'ghost'} onClick={() => setView('home')}>
+            Home
+          </button>
+          <button
+            className={view === 'deckbuilder' ? 'active' : 'ghost'}
+            onClick={() => setView('deckbuilder')}
+          >
+            Deckbuilder
+          </button>
+          <button className={view === 'board' ? 'active' : 'ghost'} onClick={() => setView('board')}>
+            Board
+          </button>
+        </div>
+        <span className="app-title">DuelingChaos</span>
         <div className="header-actions">
           <ThemeToggle theme={theme} onChange={setTheme} />
           {CLERK_ENABLED && <AuthHeader />}

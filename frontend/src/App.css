@@ -16,11 +16,18 @@
 }
 
 .view-switcher {
+  position: relative;
   display: flex;
+  align-items: center;
   flex-shrink: 0;
   gap: 8px;
   padding: 10px 24px;
   border-bottom: 1px solid var(--blue-mid);
+}
+
+.nav-links {
+  display: flex;
+  gap: 8px;
 }
 
 .view-switcher button {
@@ -31,6 +38,24 @@
 .view-switcher button.active {
   background: var(--gold);
   color: var(--bg);
+}
+
+/* Centered regardless of how wide .nav-links/.header-actions end up —
+   absolutely positioned against .view-switcher rather than a flex:1
+   spacer, so it stays dead-center on the bar instead of just centered in
+   whatever space is left between the two side groups. */
+.app-title {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--serif);
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--gold);
+  text-shadow: 0 0 8px rgba(237, 202, 55, 0.4);
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .header-actions {
