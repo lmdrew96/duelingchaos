@@ -369,7 +369,11 @@ public class BridgeMain {
     // which endpoint calls it, so reaching Graveyard/Exile here is what's
     // needed to answer those prompts (e.g. Cache Grab's "choose a permanent
     // card milled this way") — no new choice-resolution path required.
-    private static final ZoneType[] SELECTABLE_ZONES = { ZoneType.Battlefield, ZoneType.Graveyard, ZoneType.Exile };
+    // Command is here too so clicking a command-zone card (playing a
+    // commander) reuses this same selectCard() call — identical mechanism
+    // to casting from hand, just a different source zone.
+    private static final ZoneType[] SELECTABLE_ZONES =
+        { ZoneType.Battlefield, ZoneType.Graveyard, ZoneType.Exile, ZoneType.Command };
 
     private static void handleSelectEntity(HttpExchange exchange) throws IOException {
         if (!"POST".equals(exchange.getRequestMethod())) {

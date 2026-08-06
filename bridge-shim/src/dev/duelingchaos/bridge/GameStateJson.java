@@ -297,6 +297,7 @@ public final class GameStateJson {
         sb.append("\"battlefield\":"); writeCards(sb, p.getBattlefield()); sb.append(',');
         sb.append("\"graveyard\":"); writeCards(sb, p.getGraveyard()); sb.append(',');
         sb.append("\"exile\":"); writeCards(sb, p.getExile()); sb.append(',');
+        sb.append("\"command\":"); writeCommand(sb, p); sb.append(',');
         sb.append("\"libraryCount\":").append(p.getZoneSize(ZoneType.Library));
         sb.append('}');
     }
@@ -314,6 +315,36 @@ public final class GameStateJson {
             }
         }
         return mana.toString();
+    }
+
+    // Command zone (commanders, plus emblems/backgrounds for the cards that
+    // put those there) — same shape as writeCards' battlefield/graveyard
+    // cards, except manaCost has commander tax (rule 903.8: +{2} generic per
+    // previous cast from the command zone this game) folded in, so the
+    // "play commander" modal shows what it'll actually cost right now
+    // instead of just the printed cost. getCommanderCast() is 0 for anything
+    // that isn't a cast-from-command-zone commander (emblems, etc.), so the
+    // combine() is a no-op for those.
+    private static void writeCommand(StringBuilder sb, PlayerView p) {
+        sb.append('[');
+        boolean first = true;
+        for (CardView c : p.getCommand()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append('{');
+            field(sb, "id", c.getId()); sb.append(',');
+            field(sb, "name", c.getCurrentState().getName()); sb.append(',');
+            field(sb, "tapped", c.isTapped()); sb.append(',');
+            field(sb, "power", c.getCurrentState().getPower()); sb.append(',');
+            field(sb, "toughness", c.getCurrentState().getToughness()); sb.append(',');
+            ManaCost base = c.getCurrentState().getManaCost();
+            int tax = 2 * p.getCommanderCast(c);
+            ManaCost withTax = tax > 0 ? ManaCost.combine(base, ManaCost.get(tax)) : base;
+            field(sb, "manaCost", CardDbJson.formatManaCost(withTax)); sb.append(',');
+            field(sb, "typeCategory", typeCategory(c.getCurrentState().getType()));
+            sb.append('}');
+        }
+        sb.append(']');
     }
 
     private static void writeCards(StringBuilder sb, FCollectionView<CardView> cards) {

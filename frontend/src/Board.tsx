@@ -240,6 +240,7 @@ function PlayerZone({
   onHoverEnd,
   onGraveyardClick,
   onExileClick,
+  onCommandZoneClick,
   attackingRefs,
   blockingRefs,
   lifeFlash,
@@ -260,6 +261,7 @@ function PlayerZone({
   onHoverEnd?: () => void;
   onGraveyardClick?: () => void;
   onExileClick?: () => void;
+  onCommandZoneClick?: () => void;
   attackingRefs?: Set<EntityRef>;
   blockingRefs?: Set<EntityRef>;
   lifeFlash?: 'up' | 'down';
@@ -306,6 +308,15 @@ function PlayerZone({
           >
             exile {player.exile.length}
           </button>
+          {/* Command zone starts empty for non-Commander games, so the
+              button only shows up when there's actually something in it
+              (a commander, or an emblem) — same disabled-when-empty
+              treatment as graveyard/exile above. */}
+          {player.command.length > 0 && (
+            <button type="button" className="zone-count-btn" onClick={onCommandZoneClick}>
+              command {player.command.length}
+            </button>
+          )}
           {/* Poison/energy/experience are relevant to only a handful of
               archetypes (infect, energy decks, planeswalker-heavy commander)
               — shown only when actually in play so most games don't carry
@@ -631,11 +642,17 @@ function ZoneModal({
   cards,
   onClose,
   onSelect,
+  showCost,
 }: {
   title: string;
   cards: BoardCard[];
   onClose: () => void;
   onSelect?: (card: BoardCard) => void;
+  // Command zone only — the printed cost isn't what it'll actually cost to
+  // cast once commander tax applies, so the modal shows the tax-adjusted
+  // cost the bridge already computed (see GameStateJson.writeCommand)
+  // instead of leaving the player to do that math themselves.
+  showCost?: boolean;
 }) {
   const [detailCardName, setDetailCardName] = useState<string | null>(null);
   return (
@@ -658,6 +675,11 @@ function ZoneModal({
               onClick={() => (onSelect ? onSelect(c) : setDetailCardName(c.name))}
             >
               <CardArt name={c.name} variant="crop" className="graveyard-card-art" />
+              {showCost && c.manaCost && (
+                <span className="graveyard-card-cost">
+                  <ManaPips cost={c.manaCost} size="sm" />
+                </span>
+              )}
               {onSelect && (
                 <button
                   type="button"
@@ -820,6 +842,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
   const [hoverCard, setHoverCard] = useState<{ name: string; el: HTMLElement } | null>(null);
   const [graveyardOwnerId, setGraveyardOwnerId] = useState<number | null>(null);
   const [exileOwnerId, setExileOwnerId] = useState<number | null>(null);
+  const [commandZoneOwnerId, setCommandZoneOwnerId] = useState<number | null>(null);
   const [stackDetailItem, setStackDetailItem] = useState<StackItem | null>(null);
   const [dismissedPointerIds, setDismissedPointerIds] = useState<Set<string>>(new Set());
   const [logOpen, setLogOpen] = useState(false);
@@ -1145,6 +1168,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
           onHoverEnd={() => setHoverCard(null)}
           onGraveyardClick={() => setGraveyardOwnerId(opponent.id)}
           onExileClick={() => setExileOwnerId(opponent.id)}
+          onCommandZoneClick={() => setCommandZoneOwnerId(opponent.id)}
           attackingRefs={attackingRefs}
           blockingRefs={blockingRefs}
           lifeFlash={lifeFlash.get(opponent.id)}
@@ -1168,6 +1192,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
           onHoverEnd={() => setHoverCard(null)}
           onGraveyardClick={() => setGraveyardOwnerId(human.id)}
           onExileClick={() => setExileOwnerId(human.id)}
+          onCommandZoneClick={() => setCommandZoneOwnerId(human.id)}
           attackingRefs={attackingRefs}
           blockingRefs={blockingRefs}
           lifeFlash={lifeFlash.get(human.id)}
@@ -1276,6 +1301,38 @@ export default function Board({ onExit }: { onExit: () => void }) {
               onSelect={
                 prompt?.message && !choice
                   ? (card) => runAction(() => api.selectEntity(`card:${card.id}`))
+                  : undefined
+              }
+            />
+          );
+        })()}
+
+      {/* Clicking a card here is the same "play" action as clicking a hand
+          card (see api.playCard) — casting a commander is just casting a
+          spell from a different zone, Forge treats it identically once the
+          click reaches selectCard(). Only wired for the human's own zone;
+          the opponent's is browsable but not actionable, same spirit as
+          graveyard/exile staying view-only for the AI seat. */}
+      {commandZoneOwnerId != null &&
+        (() => {
+          const owner = state.players.find((p) => p.id === commandZoneOwnerId);
+          if (!owner) return null;
+          return (
+            <ZoneModal
+              title={`${owner.name}'s command zone`}
+              cards={owner.command}
+              onClose={() => setCommandZoneOwnerId(null)}
+              showCost
+              onSelect={
+                !choice && owner.id === human?.id
+                  ? (card) => {
+                      // Close immediately, not after the action resolves —
+                      // this backdrop sits above the choice-panel z-index,
+                      // so leaving it open would hide the mana-payment
+                      // prompt casting a commander is about to trigger.
+                      setCommandZoneOwnerId(null);
+                      runAction(() => api.selectEntity(`card:${card.id}`));
+                    }
                   : undefined
               }
             />

@@ -70,6 +70,7 @@ export type PlayerState = {
   battlefield: BoardCard[];
   graveyard: BoardCard[];
   exile: BoardCard[];
+  command: BoardCard[];
   libraryCount: number;
 };
 

@@ -606,6 +606,10 @@
   aspect-ratio: 5 / 4;
 }
 
+.graveyard-card-cost {
+  padding: 3px 6px 0;
+}
+
 .graveyard-card-name {
   font-size: 0.68rem;
   padding: 4px 6px;
