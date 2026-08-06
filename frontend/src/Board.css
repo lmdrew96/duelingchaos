@@ -907,6 +907,27 @@
 .choice-pip.pip-g { background: #00733e; }
 .choice-pip.pip-c { background: #bdbdbd; }
 
+/* AI-warning modal (PlayGate) — plain underlined labels rather than
+   choice-option's pill/button treatment, since these cards aren't
+   selectable, just listed. */
+.ai-warning-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 14px 24px;
+  margin: 4px 0 16px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.ai-warning-card {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text);
+  text-align: center;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--blue-mid);
+}
+
 .choice-footer {
   display: flex;
   justify-content: center;

@@ -132,6 +132,16 @@ export async function getMatchStats(token: string | null): Promise<MatchStats> {
   return res.json();
 }
 
+// Cards in a preset that Forge's own AI deck generator refuses to build
+// decks with (CardAiHints.getRemAIDecks() — the "AI:RemoveDeck:All" script
+// tag) — surfaced so a player picking this precon as their opponent knows
+// upfront the AI may pilot it badly. Empty array for a clean precon.
+export async function getAiWarnings(presetName: string): Promise<string[]> {
+  const res = await fetch(`${BASE}/decks/ai-warnings?name=${encodeURIComponent(presetName)}`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
 export async function checkLegality(format: string, cards: DeckCard[]): Promise<Legality> {
   const res = await fetch(`${BASE}/legality/check?format=${encodeURIComponent(format)}`, {
     method: 'POST',

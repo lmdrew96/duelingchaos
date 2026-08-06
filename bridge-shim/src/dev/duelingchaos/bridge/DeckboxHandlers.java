@@ -52,6 +52,7 @@ public final class DeckboxHandlers {
         server.createContext("/decks/save", DeckboxHandlers::handleDeckSave);
         server.createContext("/decks/delete", DeckboxHandlers::handleDeckDelete);
         server.createContext("/legality/check", DeckboxHandlers::handleLegalityCheck);
+        server.createContext("/decks/ai-warnings", DeckboxHandlers::handleDeckAiWarnings);
     }
 
     private static void handleCardSearch(HttpExchange exchange) throws IOException {
@@ -239,6 +240,44 @@ public final class DeckboxHandlers {
 
         int deckSize = mainPool.countAll() + commanderPool.countAll();
         respond(exchange, 200, CardDbJson.serializeLegality(deckSize, structuralProblem, banlistProblem));
+    }
+
+    // Which cards in a preset the AI shouldn't be trusted to pilot — reuses
+    // Forge's own CardAiHints.getRemAIDecks() (the "AI:RemoveDeck:All" card-
+    // script tag), the same signal Forge's own AI deck generator already
+    // uses to refuse including a card in a deck it builds for itself. A
+    // human picking this precon as their opponent gets the same warning
+    // before committing to a match the AI may pilot badly. Only presets are
+    // checked — a saved deck is never AI-piloted.
+    private static void handleDeckAiWarnings(HttpExchange exchange) throws IOException {
+        Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
+        String name = query.get("name");
+        if (name == null || !isSafeName(name)) {
+            respond(exchange, 400, "{\"error\":\"missing or invalid name\"}");
+            return;
+        }
+        File deckFile = new File(preconDir, name + ".dck");
+        if (!deckFile.isFile()) {
+            respond(exchange, 404, "{\"error\":\"deck not found\"}");
+            return;
+        }
+        Deck deck = DeckSerializer.fromFile(deckFile);
+        if (deck == null) {
+            respond(exchange, 500, "{\"error\":\"failed to parse deck file\"}");
+            return;
+        }
+        List<String> flagged = new ArrayList<>();
+        forge.deck.DeckSection[] sections = { forge.deck.DeckSection.Main, forge.deck.DeckSection.Commander };
+        for (forge.deck.DeckSection section : sections) {
+            if (!deck.has(section)) continue;
+            for (Map.Entry<PaperCard, Integer> e : deck.get(section)) {
+                PaperCard pc = e.getKey();
+                if (pc.getRules().getAiHints().getRemAIDecks() && !flagged.contains(pc.getName())) {
+                    flagged.add(pc.getName());
+                }
+            }
+        }
+        respond(exchange, 200, CardDbJson.serializeNameList(flagged));
     }
 
     // toDecklistText (frontend/src/api.ts) tags a card's line with a trailing

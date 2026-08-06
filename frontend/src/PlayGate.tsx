@@ -3,8 +3,14 @@ import { useAuth } from '@clerk/react';
 import * as api from './api';
 import type { DecksList } from './types';
 import { DecoCorners } from './DecoCorner';
+import { DecoCrown } from './DecoCrown';
 import { DecoRule } from './DecoRule';
 import './Deckbuilder.css';
+// Reuses Board's generic backdrop/choice-panel modal classes (.card-detail-
+// backdrop, .choice-panel, .choice-filter, .choice-options/.choice-option)
+// for the AI-warning modal below instead of duplicating that deco-styled
+// panel chrome here.
+import './Board.css';
 
 const CLERK_ENABLED = Boolean(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
@@ -18,6 +24,59 @@ const CONFIRMED_KEY = 'dc:matchConfirmed';
 export const isMatchConfirmed = (): boolean => sessionStorage.getItem(CONFIRMED_KEY) === 'true';
 export const markMatchConfirmed = (): void => sessionStorage.setItem(CONFIRMED_KEY, 'true');
 export const clearMatchConfirmed = (): void => sessionStorage.removeItem(CONFIRMED_KEY);
+
+// Warns before starting a match against a precon Forge's own AI can't pilot
+// well (see api.getAiWarnings) — a filterable list of the specific cards
+// flagged, not a blanket "this deck is bad" message, so the player knows
+// exactly what to expect. Confirm proceeds with the match as-is; this is
+// informational, not a hard block (curating replacement cards for every
+// flagged precon is real deck-design work, out of scope here).
+function AiWarningModal({
+  deckName,
+  cards,
+  onConfirm,
+  onCancel,
+}: {
+  deckName: string;
+  cards: string[];
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const [filter, setFilter] = useState('');
+  const visible = cards.filter((c) => c.toLowerCase().includes(filter.toLowerCase()));
+
+  return (
+    <div className="card-detail-backdrop" onClick={onCancel}>
+      <div className="choice-panel" onClick={(e) => e.stopPropagation()}>
+        <DecoCorners />
+        <DecoCrown />
+        <p className="choice-title">
+          AI can't play these cards well from {deckName}'s deck
+        </p>
+        <input
+          className="choice-filter"
+          type="text"
+          placeholder="Filter…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        <div className="ai-warning-grid">
+          {visible.map((name) => (
+            <span className="ai-warning-card" key={name}>
+              {name}
+            </span>
+          ))}
+        </div>
+        <div className="choice-footer">
+          <button onClick={onConfirm}>Confirm</button>
+          <button className="ghost" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Shown whenever the board is reached without a deck already having been
 // chosen for this match (see App.tsx) — previously the board just jumped
@@ -49,6 +108,8 @@ function PlayGateCore({
   const [opponentDeck, setOpponentDeck] = useState('random');
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiWarningCards, setAiWarningCards] = useState<string[]>([]);
+  const [showAiWarning, setShowAiWarning] = useState(false);
 
   useEffect(() => {
     getToken()
@@ -73,8 +134,23 @@ function PlayGateCore({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerFormat]);
 
-  const handleStart = async () => {
-    if (!deckName) return;
+  // 'Random' picks its actual deck server-side at match start — there's
+  // nothing to warn about until a specific precon is named.
+  useEffect(() => {
+    if (opponentDeck === 'random') {
+      setAiWarningCards([]);
+      return;
+    }
+    let cancelled = false;
+    api.getAiWarnings(opponentDeck).then((cards) => {
+      if (!cancelled) setAiWarningCards(cards);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [opponentDeck]);
+
+  const doStart = async () => {
     setStarting(true);
     setError(null);
     try {
@@ -87,6 +163,15 @@ function PlayGateCore({
     } finally {
       setStarting(false);
     }
+  };
+
+  const handleStart = () => {
+    if (!deckName) return;
+    if (aiWarningCards.length > 0) {
+      setShowAiWarning(true);
+      return;
+    }
+    doStart();
   };
 
   const handleSkip = () => {
@@ -150,6 +235,11 @@ function PlayGateCore({
                 No preset opponents are legal in {playerFormat} — a random deck will still be picked from all presets.
               </p>
             )}
+            {aiWarningCards.length > 0 && (
+              <p className="empty-hint" style={{ marginTop: 4 }}>
+                {aiWarningCards.length} card{aiWarningCards.length === 1 ? '' : 's'} in this precon the AI plays badly.
+              </p>
+            )}
             <div className="save-row" style={{ marginTop: 16 }}>
               <button disabled={starting} onClick={handleStart}>
                 {starting ? 'Starting…' : 'Start match'}
@@ -162,6 +252,17 @@ function PlayGateCore({
           </>
         )}
       </section>
+      {showAiWarning && (
+        <AiWarningModal
+          deckName={opponentDeck}
+          cards={aiWarningCards}
+          onConfirm={() => {
+            setShowAiWarning(false);
+            doStart();
+          }}
+          onCancel={() => setShowAiWarning(false)}
+        />
+      )}
     </div>
   );
 }
