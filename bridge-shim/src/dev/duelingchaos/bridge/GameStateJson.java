@@ -111,7 +111,6 @@ public final class GameStateJson {
         field(sb, "min", c.min); sb.append(',');
         field(sb, "max", c.max); sb.append(',');
         field(sb, "optional", c.optional); sb.append(',');
-        field(sb, "isNumeric", c.isNumeric); sb.append(',');
         field(sb, "initialInput", c.initialInput); sb.append(',');
         field(sb, "attacker", c.attacker); sb.append(',');
         field(sb, "amount", c.amount); sb.append(',');
@@ -200,7 +199,6 @@ public final class GameStateJson {
             if (!first) sb.append(',');
             first = false;
             sb.append('{');
-            field(sb, "type", String.valueOf(e.type())); sb.append(',');
             field(sb, "message", e.message());
             sb.append('}');
         }

@@ -59,14 +59,6 @@ export function ensureSchema(): Promise<void> {
 // and load with no section at all.
 export type StoredDeckCard = { name: string; count: number; section?: 'commander' | 'sideboard' };
 
-export async function listSavedDeckNames(userId: string): Promise<string[]> {
-  await ensureSchema();
-  const rows = (await getSql()`
-    SELECT name FROM decks WHERE user_id = ${userId} ORDER BY name
-  `) as { name: string }[];
-  return rows.map((r) => r.name);
-}
-
 export async function listSavedDeckFormats(userId: string): Promise<{ name: string; format: string }[]> {
   await ensureSchema();
   const rows = (await getSql()`

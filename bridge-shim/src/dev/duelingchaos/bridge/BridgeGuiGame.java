@@ -79,7 +79,6 @@ public class BridgeGuiGame extends AbstractGuiGame {
         public final int min;
         public final int max;
         public final boolean optional;
-        public final boolean isNumeric;
         public final String initialInput;
         public final String attacker;
         // Shared by "combatDamage" (total combat damage) and "splitAmount"
@@ -99,7 +98,7 @@ public class BridgeGuiGame extends AbstractGuiGame {
         public final String sourceRef;
 
         private PendingChoice(String kind, String title, List<String> options, int min, int max,
-                boolean optional, boolean isNumeric, String initialInput, String attacker, int amount,
+                boolean optional, String initialInput, String attacker, int amount,
                 List<String> refs, String sourceRef) {
             this.kind = kind;
             this.title = title;
@@ -107,7 +106,6 @@ public class BridgeGuiGame extends AbstractGuiGame {
             this.min = min;
             this.max = max;
             this.optional = optional;
-            this.isNumeric = isNumeric;
             this.initialInput = initialInput;
             this.attacker = attacker;
             this.amount = amount;
@@ -116,23 +114,23 @@ public class BridgeGuiGame extends AbstractGuiGame {
         }
 
         static PendingChoice list(String title, List<String> options, int min, int max) {
-            return new PendingChoice("list", title, options, min, max, false, false, null, null, 0, null, null);
+            return new PendingChoice("list", title, options, min, max, false, null, null, 0, null, null);
         }
 
         static PendingChoice target(String title, List<String> options, List<String> refs, String sourceRef, boolean optional) {
-            return new PendingChoice("target", title, options, optional ? 0 : 1, 1, optional, false, null, null, 0, refs, sourceRef);
+            return new PendingChoice("target", title, options, optional ? 0 : 1, 1, optional, null, null, 0, refs, sourceRef);
         }
 
         static PendingChoice targets(String title, List<String> options, List<String> refs, String sourceRef, int min, int max) {
-            return new PendingChoice("targets", title, options, min, max, min == 0, false, null, null, 0, refs, sourceRef);
+            return new PendingChoice("targets", title, options, min, max, min == 0, null, null, 0, refs, sourceRef);
         }
 
         static PendingChoice number(String title, String initialInput) {
-            return new PendingChoice("number", title, null, 0, 0, false, true, initialInput, null, 0, null, null);
+            return new PendingChoice("number", title, null, 0, 0, false, initialInput, null, 0, null, null);
         }
 
         static PendingChoice combatDamage(String attacker, List<String> blockerLabels, int damage) {
-            return new PendingChoice("combatDamage", "Assign combat damage", blockerLabels, 0, 0, false, false, null, attacker, damage, null, null);
+            return new PendingChoice("combatDamage", "Assign combat damage", blockerLabels, 0, 0, false, null, attacker, damage, null, null);
         }
 
         // atLeastOne mirrors Forge's own constraint (e.g. Fling-style effects
@@ -140,7 +138,7 @@ public class BridgeGuiGame extends AbstractGuiGame {
         // `optional` the same way `number`'s min does: true means a target
         // may legally end up at 0.
         static PendingChoice splitAmount(String title, List<String> targetLabels, int amount, boolean atLeastOne) {
-            return new PendingChoice("splitAmount", title, targetLabels, atLeastOne ? 1 : 0, 0, !atLeastOne, false, null, null, amount, null, null);
+            return new PendingChoice("splitAmount", title, targetLabels, atLeastOne ? 1 : 0, 0, !atLeastOne, null, null, amount, null, null);
         }
     }
 

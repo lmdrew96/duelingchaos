@@ -50,7 +50,7 @@ public class BridgeMain {
 
     public static void main(String[] args) throws IOException {
         if (args.length < 2) {
-            System.err.println("Usage: BridgeMain <deck1.dck> <deck2.dck> [port] [decksDir] [preconsDir]");
+            System.err.println("Usage: BridgeMain <deck1.dck> <deck2.dck> [port] [preconsDir]");
             System.exit(1);
         }
 
@@ -65,8 +65,7 @@ public class BridgeMain {
         }
 
         int port = args.length > 2 ? Integer.parseInt(args[2]) : 8787;
-        File decksDir = args.length > 3 ? new File(args[3]) : new File("decks");
-        File preconsDir = args.length > 4 ? new File(args[4]) : new File("res/quest/precons");
+        File preconsDir = args.length > 3 ? new File(args[3]) : new File("res/quest/precons");
 
         // Hardcoding Constructed here meant a deck's [Commander] section
         // never actually seeded a command zone at runtime — Forge only
@@ -134,7 +133,7 @@ public class BridgeMain {
         server.createContext("/action/concede", BridgeMain::handleConcede);
         server.createContext("/action/undo", BridgeMain::handleUndo);
         server.createContext("/action/cheat", BridgeMain::handleCheat);
-        DeckboxHandlers.register(server, decksDir, preconsDir);
+        DeckboxHandlers.register(server, preconsDir);
         server.setExecutor(null);
         server.start();
         System.out.println("BRIDGE_READY port=" + port);

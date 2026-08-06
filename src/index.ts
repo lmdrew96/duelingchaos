@@ -54,7 +54,7 @@ function startForgeShim(deck1: string, deck2: string): Promise<ChildProcessWitho
     const classpath = `${FORGE_JAR}:${SHIM_BUILD_DIR}`;
     const child = spawn(
       'java',
-      ['-cp', classpath, 'dev.duelingchaos.bridge.BridgeMain', deck1, deck2, String(JAVA_PORT), DECKS_DIR, PRESETS_DIR],
+      ['-cp', classpath, 'dev.duelingchaos.bridge.BridgeMain', deck1, deck2, String(JAVA_PORT), PRESETS_DIR],
       { cwd: FORGE_DIR },
     );
 
@@ -375,7 +375,13 @@ async function handleMatchReport(req: http.IncomingMessage, res: http.ServerResp
     return;
   }
   const body = await readRequestBody(req);
-  const { won, isDraw, conceded } = JSON.parse(body) as { won: boolean; isDraw: boolean; conceded: boolean };
+  let won: boolean, isDraw: boolean, conceded: boolean;
+  try {
+    ({ won, isDraw, conceded } = JSON.parse(body) as { won: boolean; isDraw: boolean; conceded: boolean });
+  } catch {
+    respondJson(res, 400, { error: 'invalid JSON body' });
+    return;
+  }
   currentMatch.reported = true;
   await recordMatchResult(currentMatch.userId, currentMatch.deckName, won, isDraw, conceded);
   respondJson(res, 200, { recorded: true });

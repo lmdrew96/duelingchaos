@@ -40,17 +40,13 @@ public final class DeckboxHandlers {
     // gitignored, a per-machine local install, so anything curated there
     // wouldn't survive a fresh checkout). See src/index.ts's PRESETS_DIR.
     private static File preconDir;
-    private static File savedDecksDir;
 
-    public static void register(HttpServer server, File decksDir, File preconsDir) {
-        savedDecksDir = decksDir;
+    public static void register(HttpServer server, File preconsDir) {
         preconDir = preconsDir;
         server.createContext("/cards/search", DeckboxHandlers::handleCardSearch);
         server.createContext("/formats/list", DeckboxHandlers::handleFormatsList);
         server.createContext("/decks/list", DeckboxHandlers::handleDecksList);
         server.createContext("/decks/get", DeckboxHandlers::handleDeckGet);
-        server.createContext("/decks/save", DeckboxHandlers::handleDeckSave);
-        server.createContext("/decks/delete", DeckboxHandlers::handleDeckDelete);
         server.createContext("/legality/check", DeckboxHandlers::handleLegalityCheck);
         server.createContext("/decks/ai-warnings", DeckboxHandlers::handleDeckAiWarnings);
     }
@@ -86,11 +82,9 @@ public final class DeckboxHandlers {
 
     private static void handleDecksList(HttpExchange exchange) throws IOException {
         List<String> presets = listDeckNames(preconDir);
-        List<String> saved = listDeckNames(savedDecksDir);
         StringBuilder sb = new StringBuilder();
         sb.append('{');
         sb.append("\"presets\":").append(CardDbJson.serializeNameList(presets)).append(',');
-        sb.append("\"saved\":").append(CardDbJson.serializeNameList(saved)).append(',');
         sb.append("\"presetFormats\":").append(CardDbJson.serializeStringListMap(computePresetFormats()));
         sb.append('}');
         respond(exchange, 200, sb.toString());
@@ -141,16 +135,18 @@ public final class DeckboxHandlers {
         return names;
     }
 
+    // Only preset decks are ever fetched through the shim now — saved decks
+    // are Clerk+Postgres-backed (see src/index.ts's handleDeckGet, which
+    // only proxies here when source=preset and serves everything else from
+    // Neon directly).
     private static void handleDeckGet(HttpExchange exchange) throws IOException {
         Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
-        String source = query.getOrDefault("source", "saved");
         String name = query.get("name");
         if (name == null || !isSafeName(name)) {
             respond(exchange, 400, "{\"error\":\"missing or invalid name\"}");
             return;
         }
-        File dir = "preset".equals(source) ? preconDir : savedDecksDir;
-        File deckFile = new File(dir, name + ".dck");
+        File deckFile = new File(preconDir, name + ".dck");
         if (!deckFile.isFile()) {
             respond(exchange, 404, "{\"error\":\"deck not found\"}");
             return;
@@ -161,56 +157,6 @@ public final class DeckboxHandlers {
             return;
         }
         respond(exchange, 200, CardDbJson.serializeDeck(name, deck));
-    }
-
-    // Request body is a plain-text decklist, one card per line ("N Card
-    // Name") — Forge's own CardPool.fromCardList parses this directly, so
-    // there's no need for a JSON body parser here.
-    private static void handleDeckSave(HttpExchange exchange) throws IOException {
-        if (!"POST".equals(exchange.getRequestMethod())) {
-            respond(exchange, 405, "{\"error\":\"POST only\"}");
-            return;
-        }
-        Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
-        String name = query.get("name");
-        if (name == null || !isSafeName(name)) {
-            respond(exchange, 400, "{\"error\":\"missing or invalid name\"}");
-            return;
-        }
-
-        String body = readBody(exchange);
-        CardPool pool = parseDecklist(body);
-        if (pool.countAll() == 0) {
-            respond(exchange, 400, "{\"error\":\"empty or unparseable decklist\"}");
-            return;
-        }
-
-        Deck deck = new Deck(name);
-        deck.putSection(forge.deck.DeckSection.Main, pool);
-        deck.setDeckFormat(DeckFormat.Constructed);
-
-        if (!savedDecksDir.isDirectory() && !savedDecksDir.mkdirs()) {
-            respond(exchange, 500, "{\"error\":\"failed to create decks directory\"}");
-            return;
-        }
-        DeckSerializer.writeDeck(deck, new File(savedDecksDir, name + ".dck"));
-        respond(exchange, 200, CardDbJson.serializeDeck(name, deck));
-    }
-
-    private static void handleDeckDelete(HttpExchange exchange) throws IOException {
-        if (!"POST".equals(exchange.getRequestMethod())) {
-            respond(exchange, 405, "{\"error\":\"POST only\"}");
-            return;
-        }
-        Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
-        String name = query.get("name");
-        if (name == null || !isSafeName(name)) {
-            respond(exchange, 400, "{\"error\":\"missing or invalid name\"}");
-            return;
-        }
-        File deckFile = new File(savedDecksDir, name + ".dck");
-        boolean deleted = deckFile.isFile() && deckFile.delete();
-        respond(exchange, 200, "{\"deleted\":" + deleted + "}");
     }
 
     private static void handleLegalityCheck(HttpExchange exchange) throws IOException {
