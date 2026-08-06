@@ -256,8 +256,16 @@ function DeckbuilderCore({
   // cost color; identity includes ability-text/hybrid mana symbols, see
   // CardInfo.colorIdentity). Null (no commander) means no restriction.
   const commanderIdentity = commanderCard ? cardInfoCache[commanderCard.name]?.colorIdentity ?? null : null;
+  // Forge renders a colorless identity as the literal string "C" (e.g.
+  // Command Tower, Sol Ring), not "" — "C" is never mixed with real WUBRG
+  // letters (confirmed: a colored+colorless card's identity is just its
+  // color letters, "C" only ever appears alone), so it's not a real color
+  // to check membership for. Real rule: colorless is a subset of every
+  // commander's identity, always legal.
   const withinCommanderIdentity = (colorIdentity: string) =>
-    commanderIdentity == null || [...colorIdentity].every((c) => commanderIdentity.includes(c));
+    commanderIdentity == null ||
+    colorIdentity === 'C' ||
+    [...colorIdentity].every((c) => commanderIdentity.includes(c));
   const visibleSearchResults = searchResults.filter((c) => withinCommanderIdentity(c.colorIdentity));
 
   const manaCurve = useMemo(() => {
