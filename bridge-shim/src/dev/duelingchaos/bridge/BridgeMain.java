@@ -105,7 +105,6 @@ public class BridgeMain {
 
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
         server.createContext("/state", BridgeMain::handleState);
-        server.createContext("/action/pass-priority", BridgeMain::handlePassPriority);
         server.createContext("/action/play-card", BridgeMain::handlePlayCard);
         server.createContext("/action/tap-land", BridgeMain::handleTapLand);
         server.createContext("/action/select-ok", exchange -> handleButton(exchange, true));
@@ -164,9 +163,9 @@ public class BridgeMain {
     }
 
     // concede() ends the game immediately with the human as the loser — no
-    // pendingChoice/rendezvous needed, it's a direct one-way action like
-    // passPriority. Confirming with the player is the frontend's job (same
-    // pattern as the deckbuilder's delete-deck confirm).
+    // pendingChoice/rendezvous needed, it's a direct one-way action.
+    // Confirming with the player is the frontend's job (same pattern as the
+    // deckbuilder's delete-deck confirm).
     private static void handleConcede(HttpExchange exchange) throws IOException {
         if (!"POST".equals(exchange.getRequestMethod())) {
             respond(exchange, 405, "{\"error\":\"POST only\"}");
@@ -253,18 +252,15 @@ public class BridgeMain {
         }
     }
 
-    private static void handlePassPriority(HttpExchange exchange) throws IOException {
-        if (!"POST".equals(exchange.getRequestMethod())) {
-            respond(exchange, 405, "{\"error\":\"POST only\"}");
-            return;
-        }
-        humanController.passPriority();
-        respond(exchange, 200, "{\"ok\":true}");
-    }
+    // Covers every generic two-button dialog Forge drives through
+    // updateButtons/selectButtonOK/selectButtonCancel — the opening-hand
+    // keep/mulligan choice, and (verified via bytecode: PlayerControllerHuman
+    // .passPriority() and .selectButtonOk() both resolve to the exact same
+    // InputProxy.selectButtonOK() call whenever InputPassPriority is the
+    // active input) the ordinary OK/End Turn priority-window buttons too —
+    // there used to be a separate dedicated /action/pass-priority route for
+    // the latter, redundant with this one and removed.
 
-    // Covers non-priority prompts routed through the two generic dialog
-    // buttons (e.g. the opening-hand keep/mulligan choice) rather than
-    // through passPriority/selectCard.
     private static void handleButton(HttpExchange exchange, boolean ok) throws IOException {
         if (!"POST".equals(exchange.getRequestMethod())) {
             respond(exchange, 405, "{\"error\":\"POST only\"}");

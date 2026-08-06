@@ -151,7 +151,6 @@ async function postAction(path: string, body?: object): Promise<void> {
   });
 }
 
-export const passPriority = (): Promise<void> => postAction('pass-priority');
 export const selectOk = (): Promise<void> => postAction('select-ok');
 export const selectCancel = (): Promise<void> => postAction('select-cancel');
 export const concede = (): Promise<void> => postAction('concede');

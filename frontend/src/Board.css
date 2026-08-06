@@ -45,9 +45,12 @@
   color: var(--gold);
 }
 
-/* Pass priority is the one primary action worth a filled gold tab — every
-   other button in this UI stays a hairline outline so chrome recedes and
-   cards stay the visual focus (see the Polish patch's deco direction). */
+/* Passing priority (the phase card's OK/End Turn button — a standalone HUD
+   button used to duplicate this, verified via bytecode to be the exact same
+   underlying action and removed) is the one primary action worth a filled
+   gold tab; every other button in this UI stays a hairline outline so
+   chrome recedes and cards stay the visual focus (see the Polish patch's
+   deco direction). */
 .pass-priority-btn {
   background: var(--gold);
   border: none;

@@ -1044,9 +1044,6 @@ export default function Board({ onExit }: { onExit: () => void }) {
         <button className="ghost" disabled={!state.canUndo} onClick={() => runAction(api.undo)}>
           undo
         </button>
-        <button className="pass-priority-btn" onClick={() => runAction(api.passPriority)}>
-          pass priority
-        </button>
         <button
           className="concede-btn"
           onClick={() => {
@@ -1073,7 +1070,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
           <span className="priority-status-message">{prompt.message}</span>
           <div className="priority-status-buttons">
             {prompt.button1Enabled && (
-              <button className="ghost" onClick={() => runAction(api.selectOk)}>
+              <button className="pass-priority-btn" onClick={() => runAction(api.selectOk)}>
                 {prompt.button1}
               </button>
             )}
