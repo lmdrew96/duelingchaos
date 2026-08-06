@@ -1,6 +1,7 @@
 package dev.duelingchaos.bridge;
 
 import forge.card.CardRules;
+import forge.card.mana.ManaCost;
 import forge.deck.CardPool;
 import forge.deck.Deck;
 import forge.deck.DeckSection;
@@ -41,7 +42,7 @@ public final class CardDbJson {
         CardRules r = pc.getRules();
         sb.append('{');
         field(sb, "name", pc.getName()); sb.append(',');
-        field(sb, "manaCost", r.getManaCost() == null ? "" : r.getManaCost().toString()); sb.append(',');
+        field(sb, "manaCost", formatManaCost(r.getManaCost())); sb.append(',');
         field(sb, "type", String.valueOf(r.getType())); sb.append(',');
         field(sb, "colors", r.getColor() == null ? "" : r.getColor().toString()); sb.append(',');
         // Color identity (commander legality's actual axis — includes mana
@@ -54,6 +55,17 @@ public final class CardDbJson {
         field(sb, "toughness", r.getToughness()); sb.append(',');
         field(sb, "oracleText", r.getOracleText());
         sb.append('}');
+    }
+
+    // Forge represents a costless card (e.g. a basic land) as
+    // ManaCost.NO_COST rather than null, and NO_COST.toString() renders as
+    // the literal "no cost" — passed through as-is it shows up as visible
+    // "no cost" text in the frontend's ManaPips fallback (see manaCost.tsx)
+    // instead of the empty cost it actually is.
+    static String formatManaCost(ManaCost cost) {
+        if (cost == null) return "";
+        String s = cost.toString();
+        return "no cost".equalsIgnoreCase(s) ? "" : s;
     }
 
     public static String serializeFormatNames(Iterable<GameFormat> formats) {

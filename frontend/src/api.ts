@@ -36,11 +36,15 @@ export async function searchCards(query: string, limit = 300): Promise<CardSearc
   return { cards: normalized, truncated };
 }
 
-// /cards/search matches by substring, not exact name — a board card's name
-// is always a real card name though, so an exact case-insensitive match
-// (falling back to the first hit) reliably resolves it to its full detail.
+// A bare /cards/search query matches name OR type OR oracle text, so a short
+// common name like "Swamp" or "Forest" mostly surfaces cards that merely
+// *mention* it in their rules text — the real card can easily fall outside
+// even a generous result limit. `name!"..."` forces the search's exact-name
+// operator (see ScryfallQuery.parseTerm/build) so this always resolves the
+// literal named card. The find()/cards[0] fallback stays as a safety net,
+// not the primary path.
 export async function getCardDetail(name: string): Promise<CardInfo | null> {
-  const { cards } = await searchCards(name, 5);
+  const { cards } = await searchCards(`name!"${name}"`, 5);
   if (cards.length === 0) return null;
   return cards.find((c) => c.name.toLowerCase() === name.toLowerCase()) ?? cards[0];
 }

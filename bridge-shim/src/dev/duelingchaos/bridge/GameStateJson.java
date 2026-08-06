@@ -328,7 +328,7 @@ public final class GameStateJson {
             field(sb, "power", c.getCurrentState().getPower()); sb.append(',');
             field(sb, "toughness", c.getCurrentState().getToughness()); sb.append(',');
             ManaCost manaCost = c.getCurrentState().getManaCost();
-            field(sb, "manaCost", manaCost == null ? "" : manaCost.toString()); sb.append(',');
+            field(sb, "manaCost", CardDbJson.formatManaCost(manaCost)); sb.append(',');
             field(sb, "typeCategory", typeCategory(c.getCurrentState().getType()));
             sb.append('}');
         }
