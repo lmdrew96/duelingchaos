@@ -35,11 +35,16 @@ import java.util.function.Predicate;
 public final class DeckboxHandlers {
     private DeckboxHandlers() {}
 
-    private static final File PRECON_DIR = new File("res/quest/precons");
+    // Curated preset library, tracked in the repo — NOT the ~500-deck
+    // res/quest/precons that ships inside vendor/forge (that whole tree is
+    // gitignored, a per-machine local install, so anything curated there
+    // wouldn't survive a fresh checkout). See src/index.ts's PRESETS_DIR.
+    private static File preconDir;
     private static File savedDecksDir;
 
-    public static void register(HttpServer server, File decksDir) {
+    public static void register(HttpServer server, File decksDir, File preconsDir) {
         savedDecksDir = decksDir;
+        preconDir = preconsDir;
         server.createContext("/cards/search", DeckboxHandlers::handleCardSearch);
         server.createContext("/formats/list", DeckboxHandlers::handleFormatsList);
         server.createContext("/decks/list", DeckboxHandlers::handleDecksList);
@@ -79,7 +84,7 @@ public final class DeckboxHandlers {
     }
 
     private static void handleDecksList(HttpExchange exchange) throws IOException {
-        List<String> presets = listDeckNames(PRECON_DIR);
+        List<String> presets = listDeckNames(preconDir);
         List<String> saved = listDeckNames(savedDecksDir);
         StringBuilder sb = new StringBuilder();
         sb.append('{');
@@ -109,7 +114,7 @@ public final class DeckboxHandlers {
             respond(exchange, 400, "{\"error\":\"missing or invalid name\"}");
             return;
         }
-        File dir = "preset".equals(source) ? PRECON_DIR : savedDecksDir;
+        File dir = "preset".equals(source) ? preconDir : savedDecksDir;
         File deckFile = new File(dir, name + ".dck");
         if (!deckFile.isFile()) {
             respond(exchange, 404, "{\"error\":\"deck not found\"}");

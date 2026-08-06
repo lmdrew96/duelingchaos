@@ -3,6 +3,7 @@ package dev.duelingchaos.bridge;
 import forge.card.CardRules;
 import forge.deck.CardPool;
 import forge.deck.Deck;
+import forge.deck.DeckSection;
 import forge.game.GameFormat;
 import forge.item.PaperCard;
 
@@ -81,21 +82,43 @@ public final class CardDbJson {
         return sb.toString();
     }
 
+    // Main is the only section this originally covered — a preset built with
+    // a Commander (or Oathbreaker's paired signature spell) silently lost
+    // that card on load, since the frontend's DeckCard.section marker (see
+    // api.ts's toDecklistText / frontend/src/types.ts) never got a chance to
+    // be set for anything outside Main.
+    private static final java.util.Map<DeckSection, String> SECTION_MARKER = new java.util.LinkedHashMap<>();
+    static {
+        SECTION_MARKER.put(DeckSection.Main, null);
+        SECTION_MARKER.put(DeckSection.Commander, "commander");
+        SECTION_MARKER.put(DeckSection.Sideboard, "sideboard");
+    }
+
     public static String serializeDeck(String name, Deck deck) {
         StringBuilder sb = new StringBuilder();
         sb.append('{');
         field(sb, "name", name); sb.append(',');
-        CardPool main = deck.getMain();
-        sb.append("\"deckSize\":").append(main.countAll()).append(',');
+        int deckSize = 0;
+        for (DeckSection section : SECTION_MARKER.keySet()) {
+            if (deck.has(section)) deckSize += deck.get(section).countAll();
+        }
+        sb.append("\"deckSize\":").append(deckSize).append(',');
         sb.append("\"cards\":[");
         boolean first = true;
-        for (java.util.Map.Entry<PaperCard, Integer> e : main) {
-            if (!first) sb.append(',');
-            first = false;
-            sb.append('{');
-            field(sb, "name", e.getKey().getName()); sb.append(',');
-            sb.append("\"count\":").append(e.getValue());
-            sb.append('}');
+        for (java.util.Map.Entry<DeckSection, String> entry : SECTION_MARKER.entrySet()) {
+            if (!deck.has(entry.getKey())) continue;
+            for (java.util.Map.Entry<PaperCard, Integer> e : deck.get(entry.getKey())) {
+                if (!first) sb.append(',');
+                first = false;
+                sb.append('{');
+                field(sb, "name", e.getKey().getName()); sb.append(',');
+                sb.append("\"count\":").append(e.getValue());
+                if (entry.getValue() != null) {
+                    sb.append(',');
+                    field(sb, "section", entry.getValue());
+                }
+                sb.append('}');
+            }
         }
         sb.append(']');
         sb.append('}');

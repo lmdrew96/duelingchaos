@@ -26,6 +26,10 @@ const FORGE_DIR = path.join(PROJECT_ROOT, 'vendor', 'forge');
 const FORGE_JAR = path.join(FORGE_DIR, 'forge-gui-desktop-2.0.13-jar-with-dependencies.jar');
 const SHIM_BUILD_DIR = path.join(PROJECT_ROOT, 'bridge-shim', 'build');
 const DECKS_DIR = path.join(PROJECT_ROOT, 'decks');
+// Curated preset library — tracked in the repo, unlike vendor/forge's own
+// ~500-deck res/quest/precons (that whole tree is gitignored, a per-machine
+// local install; see DeckboxHandlers.java).
+const PRESETS_DIR = path.join(PROJECT_ROOT, 'res', 'presets');
 
 const JAVA_PORT = 8787;
 const HTTP_PORT = Number(process.env.PORT) || 4310;
@@ -50,7 +54,7 @@ function startForgeShim(deck1: string, deck2: string): Promise<ChildProcessWitho
     const classpath = `${FORGE_JAR}:${SHIM_BUILD_DIR}`;
     const child = spawn(
       'java',
-      ['-cp', classpath, 'dev.duelingchaos.bridge.BridgeMain', deck1, deck2, String(JAVA_PORT), DECKS_DIR],
+      ['-cp', classpath, 'dev.duelingchaos.bridge.BridgeMain', deck1, deck2, String(JAVA_PORT), DECKS_DIR, PRESETS_DIR],
       { cwd: FORGE_DIR },
     );
 
@@ -274,11 +278,12 @@ async function handleDeckDelete(req: http.IncomingMessage, res: http.ServerRespo
   respondJson(res, 200, { deleted });
 }
 
-// Preset AI decks live as .dck files under res/quest/precons (see
-// DeckboxHandlers.PRECON_DIR); /decks/list already reports their names. This
+// Preset AI decks live as .dck files under PRESETS_DIR (see
+// DeckboxHandlers.preconDir); /decks/list already reports their names. This
 // resolves a player's opponent choice from handleMatchStart into a concrete
 // .dck path the shim can boot with — 'random'/undefined picks one of the
-// current presets uniformly at random.
+// current presets uniformly at random. An absolute path, since BridgeMain
+// runs with cwd=FORGE_DIR while PRESETS_DIR lives at the project root.
 async function resolveOpponentDeckPath(preferredName: string | undefined): Promise<string> {
   const { presets } = (await fetchShimJson('/decks/list')) as { presets: string[] };
   if (presets.length === 0) {
@@ -290,7 +295,7 @@ async function resolveOpponentDeckPath(preferredName: string | undefined): Promi
   } else if (!presets.includes(name)) {
     throw new Error(`unknown opponent deck: ${name}`);
   }
-  return `res/quest/precons/${name}.dck`;
+  return path.join(PRESETS_DIR, `${name}.dck`);
 }
 
 // Starts a new match against a chosen AI opponent using a signed-in user's
