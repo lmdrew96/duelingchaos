@@ -239,6 +239,7 @@ function PlayerZone({
   onHoverStart,
   onHoverEnd,
   onGraveyardClick,
+  onExileClick,
   attackingRefs,
   blockingRefs,
   lifeFlash,
@@ -258,6 +259,7 @@ function PlayerZone({
   onHoverStart?: (name: string, el: HTMLElement) => void;
   onHoverEnd?: () => void;
   onGraveyardClick?: () => void;
+  onExileClick?: () => void;
   attackingRefs?: Set<EntityRef>;
   blockingRefs?: Set<EntityRef>;
   lifeFlash?: 'up' | 'down';
@@ -293,6 +295,16 @@ function PlayerZone({
             onClick={onGraveyardClick}
           >
             graveyard {player.graveyard.length}
+          </button>
+          {/* Exile is public info too — same browsable treatment as the
+              graveyard, for parity. */}
+          <button
+            type="button"
+            className="zone-count-btn"
+            disabled={player.exile.length === 0 || !onExileClick}
+            onClick={onExileClick}
+          >
+            exile {player.exile.length}
           </button>
           {/* Poison/energy/experience are relevant to only a handful of
               archetypes (infect, energy decks, planeswalker-heavy commander)
@@ -603,17 +615,27 @@ function CardDetailModal({ cardName, onClose }: { cardName: string; onClose: () 
   );
 }
 
-// Graveyards are public information in real MTG (unlike libraries), so this
-// browses the actual cards rather than just showing a count. Reuses
-// CardDetailModal for a selected card's full text instead of duplicating it.
-function GraveyardModal({
-  playerName,
+// Graveyard and exile are both public information in real MTG (unlike
+// libraries), so this browses the actual cards rather than just showing a
+// count. Reuses CardDetailModal for a selected card's full text instead of
+// duplicating it. Shared by both zones since they need identical behavior.
+//
+// onSelect (passed only while a card-list Input prompt is live — see the
+// call sites) routes the click through api.selectEntity instead of opening
+// the detail popup, since Forge's Input system for choices like Cache
+// Grab's "choose a permanent card milled this way" wants a real card click,
+// not a pendingChoice answer. The "i" info button keeps card-text browsing
+// available even mid-prompt.
+function ZoneModal({
+  title,
   cards,
   onClose,
+  onSelect,
 }: {
-  playerName: string;
+  title: string;
   cards: BoardCard[];
   onClose: () => void;
+  onSelect?: (card: BoardCard) => void;
 }) {
   const [detailCardName, setDetailCardName] = useState<string | null>(null);
   return (
@@ -625,12 +647,30 @@ function GraveyardModal({
           close
         </button>
         <p className="choice-title">
-          {playerName}'s graveyard — {cards.length}
+          {title} — {cards.length}
         </p>
         <div className="graveyard-grid">
           {cards.map((c, i) => (
-            <button type="button" className="graveyard-card" key={`${c.name}-${i}`} onClick={() => setDetailCardName(c.name)}>
+            <button
+              type="button"
+              className="graveyard-card"
+              key={`${c.name}-${i}`}
+              onClick={() => (onSelect ? onSelect(c) : setDetailCardName(c.name))}
+            >
               <CardArt name={c.name} variant="crop" className="graveyard-card-art" />
+              {onSelect && (
+                <button
+                  type="button"
+                  className="card-tile-info"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDetailCardName(c.name);
+                  }}
+                  aria-label={`View ${c.name} details`}
+                >
+                  i
+                </button>
+              )}
               <span className="graveyard-card-name">{c.name}</span>
             </button>
           ))}
@@ -779,6 +819,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
   const [detailCardName, setDetailCardName] = useState<string | null>(null);
   const [hoverCard, setHoverCard] = useState<{ name: string; el: HTMLElement } | null>(null);
   const [graveyardOwnerId, setGraveyardOwnerId] = useState<number | null>(null);
+  const [exileOwnerId, setExileOwnerId] = useState<number | null>(null);
   const [stackDetailItem, setStackDetailItem] = useState<StackItem | null>(null);
   const [dismissedPointerIds, setDismissedPointerIds] = useState<Set<string>>(new Set());
   const [logOpen, setLogOpen] = useState(false);
@@ -1103,6 +1144,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
           onHoverStart={(name, el) => setHoverCard({ name, el })}
           onHoverEnd={() => setHoverCard(null)}
           onGraveyardClick={() => setGraveyardOwnerId(opponent.id)}
+          onExileClick={() => setExileOwnerId(opponent.id)}
           attackingRefs={attackingRefs}
           blockingRefs={blockingRefs}
           lifeFlash={lifeFlash.get(opponent.id)}
@@ -1125,6 +1167,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
           onHoverStart={(name, el) => setHoverCard({ name, el })}
           onHoverEnd={() => setHoverCard(null)}
           onGraveyardClick={() => setGraveyardOwnerId(human.id)}
+          onExileClick={() => setExileOwnerId(human.id)}
           attackingRefs={attackingRefs}
           blockingRefs={blockingRefs}
           lifeFlash={lifeFlash.get(human.id)}
@@ -1199,12 +1242,43 @@ export default function Board({ onExit }: { onExit: () => void }) {
 
       {hoverCard && <CardHoverPreview name={hoverCard.name} anchor={hoverCard.el} />}
 
+      {/* A card-list Input prompt (e.g. Cache Grab's "choose a permanent
+          card milled this way") never sets pendingChoice — it's answered by
+          a raw card click, same mechanism as targeting — so onSelect is
+          wired whenever the passive prompt banner is showing. */}
       {graveyardOwnerId != null &&
         (() => {
           const owner = state.players.find((p) => p.id === graveyardOwnerId);
           if (!owner) return null;
           return (
-            <GraveyardModal playerName={owner.name} cards={owner.graveyard} onClose={() => setGraveyardOwnerId(null)} />
+            <ZoneModal
+              title={`${owner.name}'s graveyard`}
+              cards={owner.graveyard}
+              onClose={() => setGraveyardOwnerId(null)}
+              onSelect={
+                prompt?.message && !choice
+                  ? (card) => runAction(() => api.selectEntity(`card:${card.id}`))
+                  : undefined
+              }
+            />
+          );
+        })()}
+
+      {exileOwnerId != null &&
+        (() => {
+          const owner = state.players.find((p) => p.id === exileOwnerId);
+          if (!owner) return null;
+          return (
+            <ZoneModal
+              title={`${owner.name}'s exile`}
+              cards={owner.exile}
+              onClose={() => setExileOwnerId(null)}
+              onSelect={
+                prompt?.message && !choice
+                  ? (card) => runAction(() => api.selectEntity(`card:${card.id}`))
+                  : undefined
+              }
+            />
           );
         })()}
 

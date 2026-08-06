@@ -359,6 +359,18 @@ public class BridgeMain {
     // same EntityRef scheme game-state JSON already exposes) across BOTH
     // players' battlefields, for targeting an opponent's creature or either
     // player directly.
+    //
+    // Also the click target for card-list Inputs Forge drives outside
+    // IGuiGame entirely (verified via bytecode: PlayerControllerHuman.
+    // chooseCardsForEffect/chooseCardsToDiscardFrom build an
+    // InputSelectCardsFromList directly and block on a raw card click,
+    // never calling into BridgeGuiGame). humanController.selectCard()
+    // already forwards to whatever Input is currently active regardless of
+    // which endpoint calls it, so reaching Graveyard/Exile here is what's
+    // needed to answer those prompts (e.g. Cache Grab's "choose a permanent
+    // card milled this way") — no new choice-resolution path required.
+    private static final ZoneType[] SELECTABLE_ZONES = { ZoneType.Battlefield, ZoneType.Graveyard, ZoneType.Exile };
+
     private static void handleSelectEntity(HttpExchange exchange) throws IOException {
         if (!"POST".equals(exchange.getRequestMethod())) {
             respond(exchange, 405, "{\"error\":\"POST only\"}");
@@ -392,15 +404,17 @@ public class BridgeMain {
             return;
         }
         for (Player p : game.getPlayers()) {
-            for (Card c : p.getCardsIn(ZoneType.Battlefield)) {
-                if (c.getId() == id) {
-                    boolean ok = humanController.selectCard(CardView.get(c), Collections.emptyList(), null);
-                    respond(exchange, 200, "{\"ok\":" + ok + "}");
-                    return;
+            for (ZoneType zone : SELECTABLE_ZONES) {
+                for (Card c : p.getCardsIn(zone)) {
+                    if (c.getId() == id) {
+                        boolean ok = humanController.selectCard(CardView.get(c), Collections.emptyList(), null);
+                        respond(exchange, 200, "{\"ok\":" + ok + "}");
+                        return;
+                    }
                 }
             }
         }
-        respond(exchange, 404, "{\"error\":\"no battlefield card with that id\"}");
+        respond(exchange, 404, "{\"error\":\"no selectable card with that id\"}");
     }
 
     private static void handlePlayCard(HttpExchange exchange) throws IOException {

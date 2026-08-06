@@ -468,7 +468,7 @@ function DeckbuilderCore({
     <div className="app-shell">
       <header className="app-header">
         <div className="app-header-row">
-          <h1>DuelingChaos — Deckbuilder</h1>
+          <h1>Deckbuilder</h1>
           <span className="subtitle">{deckSize} cards in deck</span>
         </div>
         <DecoRule />

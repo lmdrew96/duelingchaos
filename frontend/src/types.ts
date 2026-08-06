@@ -69,6 +69,7 @@ export type PlayerState = {
   hand: BoardCard[];
   battlefield: BoardCard[];
   graveyard: BoardCard[];
+  exile: BoardCard[];
   libraryCount: number;
 };
 

@@ -296,6 +296,7 @@ public final class GameStateJson {
         sb.append("\"hand\":"); writeCards(sb, p.getHand()); sb.append(',');
         sb.append("\"battlefield\":"); writeCards(sb, p.getBattlefield()); sb.append(',');
         sb.append("\"graveyard\":"); writeCards(sb, p.getGraveyard()); sb.append(',');
+        sb.append("\"exile\":"); writeCards(sb, p.getExile()); sb.append(',');
         sb.append("\"libraryCount\":").append(p.getZoneSize(ZoneType.Library));
         sb.append('}');
     }

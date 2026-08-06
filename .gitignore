@@ -3,6 +3,8 @@
 /dist
 /bridge-shim/build
 .DS_Store
+.backend.pid
+backend.log
 
 /node_modules
 npm-debug.log*
