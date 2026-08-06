@@ -44,7 +44,7 @@ function PlayGateCore({
   isSignedIn: boolean;
   onConfirmed: () => void;
 }) {
-  const [decksList, setDecksList] = useState<DecksList>({ presets: [], saved: [] });
+  const [decksList, setDecksList] = useState<DecksList>({ presets: [], saved: [], presetFormats: {}, savedFormats: {} });
   const [deckName, setDeckName] = useState('');
   const [opponentDeck, setOpponentDeck] = useState('random');
   const [starting, setStarting] = useState(false);
@@ -60,6 +60,18 @@ function PlayGateCore({
       .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Presets are curated across many formats — only offer ones legal in the
+  // format the player's own deck was saved under (see DecksList.presetFormats).
+  const playerFormat = decksList.savedFormats[deckName] ?? 'Standard';
+  const opponentOptions = decksList.presets.filter((name) => decksList.presetFormats[name]?.includes(playerFormat));
+
+  useEffect(() => {
+    if (opponentDeck !== 'random' && !opponentOptions.includes(opponentDeck)) {
+      setOpponentDeck('random');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerFormat]);
 
   const handleStart = async () => {
     if (!deckName) return;
@@ -127,12 +139,17 @@ function PlayGateCore({
               onChange={(e) => setOpponentDeck(e.target.value)}
             >
               <option value="random">Random</option>
-              {decksList.presets.map((name) => (
+              {opponentOptions.map((name) => (
                 <option key={name} value={name}>
                   {name}
                 </option>
               ))}
             </select>
+            {opponentOptions.length === 0 && (
+              <p className="empty-hint" style={{ marginTop: 4 }}>
+                No preset opponents are legal in {playerFormat} — a random deck will still be picked from all presets.
+              </p>
+            )}
             <div className="save-row" style={{ marginTop: 16 }}>
               <button disabled={starting} onClick={handleStart}>
                 {starting ? 'Starting…' : 'Start match'}

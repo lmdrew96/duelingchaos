@@ -89,9 +89,43 @@ public final class DeckboxHandlers {
         StringBuilder sb = new StringBuilder();
         sb.append('{');
         sb.append("\"presets\":").append(CardDbJson.serializeNameList(presets)).append(',');
-        sb.append("\"saved\":").append(CardDbJson.serializeNameList(saved));
+        sb.append("\"saved\":").append(CardDbJson.serializeNameList(saved)).append(',');
+        sb.append("\"presetFormats\":").append(CardDbJson.serializeStringListMap(computePresetFormats()));
         sb.append('}');
         respond(exchange, 200, sb.toString());
+    }
+
+    // Presets carry no format of their own (curated from multiple sources —
+    // see src/index.ts's PRESETS_DIR comment), so "what format is this
+    // opponent deck legal in" has to be derived the same way the curation
+    // pass verified it: run every format's own conformance checker against
+    // the deck (same structural+banlist pairing as handleLegalityCheck).
+    // Presets are static files for the life of the process, so this is
+    // computed once and cached rather than re-checked on every /decks/list.
+    private static Map<String, List<String>> presetFormatsCache;
+
+    private static Map<String, List<String>> computePresetFormats() {
+        if (presetFormatsCache != null) return presetFormatsCache;
+        Map<String, List<String>> result = new HashMap<>();
+        File[] files = preconDir.listFiles((d, name) -> name.endsWith(".dck"));
+        if (files != null) {
+            for (File f : files) {
+                String name = f.getName().substring(0, f.getName().length() - 4);
+                Deck deck = DeckSerializer.fromFile(f);
+                if (deck == null) continue;
+                List<String> legalIn = new ArrayList<>();
+                for (GameFormat format : FModel.getFormats().getOrderedList()) {
+                    DeckFormat structuralFormat = structuralFormatFor(format);
+                    deck.setDeckFormat(structuralFormat);
+                    if (structuralFormat.getDeckConformanceProblem(deck) != null) continue;
+                    if (format.getDeckConformanceProblem(deck) != null) continue;
+                    legalIn.add(format.getName());
+                }
+                result.put(name, legalIn);
+            }
+        }
+        presetFormatsCache = result;
+        return result;
     }
 
     private static List<String> listDeckNames(File dir) {

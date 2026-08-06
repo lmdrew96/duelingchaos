@@ -98,7 +98,7 @@ function Dashboard({
   getToken: () => Promise<string | null>;
   onNavigate: (view: View) => void;
 }) {
-  const [decksList, setDecksList] = useState<DecksList>({ presets: [], saved: [] });
+  const [decksList, setDecksList] = useState<DecksList>({ presets: [], saved: [], presetFormats: {}, savedFormats: {} });
   const [matchStats, setMatchStats] = useState<MatchStats>({ wins: 0, losses: 0, draws: 0, recent: [] });
   const [startingDeck, setStartingDeck] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);

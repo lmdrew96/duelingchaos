@@ -82,6 +82,19 @@ public final class CardDbJson {
         return sb.toString();
     }
 
+    public static String serializeStringListMap(java.util.Map<String, List<String>> map) {
+        StringBuilder sb = new StringBuilder();
+        sb.append('{');
+        boolean first = true;
+        for (java.util.Map.Entry<String, List<String>> entry : map.entrySet()) {
+            if (!first) sb.append(',');
+            first = false;
+            sb.append('"').append(escape(entry.getKey())).append("\":").append(serializeNameList(entry.getValue()));
+        }
+        sb.append('}');
+        return sb.toString();
+    }
+
     // Main is the only section this originally covered — a preset built with
     // a Commander (or Oathbreaker's paired signature spell) silently lost
     // that card on load, since the frontend's DeckCard.section marker (see

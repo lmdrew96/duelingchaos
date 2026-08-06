@@ -24,7 +24,16 @@ export type DeckCard = { name: string; count: number; section?: DeckCardSection 
 // at save time (see Deckbuilder's handleSave/handleLoad).
 export type DeckSummary = { name: string; deckSize: number; cards: DeckCard[]; format?: string };
 
-export type DecksList = { presets: string[]; saved: string[] };
+// presetFormats: every format a given preset deck is legal in (presets carry
+// no format of their own, so this is derived server-side — see
+// DeckboxHandlers.computePresetFormats). savedFormats: the single format a
+// saved deck was actually saved under.
+export type DecksList = {
+  presets: string[];
+  saved: string[];
+  presetFormats: Record<string, string[]>;
+  savedFormats: Record<string, string>;
+};
 
 export type MatchHistoryEntry = { deckName: string; won: boolean; isDraw: boolean; playedAt: string };
 export type MatchStats = { wins: number; losses: number; draws: number; recent: MatchHistoryEntry[] };

@@ -7,7 +7,7 @@ import {
   deleteDeck,
   getMatchStats,
   getSavedDeck,
-  listSavedDeckNames,
+  listSavedDeckFormats,
   recordMatchResult,
   saveDeck,
   StoredDeckCard,
@@ -200,10 +200,16 @@ function toDeckSummaryJson(
 // and DB" ChaosPatch scoping decision) — presets, card search, and the
 // game engine itself all stay open to anyone hitting the bridge locally.
 async function handleDecksList(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-  const presetsResult = (await fetchShimJson('/decks/list')) as { presets: string[] };
+  const presetsResult = (await fetchShimJson('/decks/list')) as {
+    presets: string[];
+    presetFormats: Record<string, string[]>;
+  };
   const userId = await getUserId(req);
-  const saved = userId ? await listSavedDeckNames(userId) : [];
-  respondJson(res, 200, { presets: presetsResult.presets, saved });
+  const savedWithFormat = userId ? await listSavedDeckFormats(userId) : [];
+  const saved = savedWithFormat.map((d) => d.name);
+  const savedFormats: Record<string, string> = {};
+  for (const d of savedWithFormat) savedFormats[d.name] = d.format;
+  respondJson(res, 200, { presets: presetsResult.presets, saved, presetFormats: presetsResult.presetFormats, savedFormats });
 }
 
 async function handleDeckGet(req: http.IncomingMessage, res: http.ServerResponse, shimPath: string): Promise<void> {

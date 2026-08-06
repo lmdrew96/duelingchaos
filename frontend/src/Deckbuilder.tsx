@@ -72,7 +72,7 @@ function DeckbuilderCore({
   const [format, setFormat] = useState('Standard');
   const [legality, setLegality] = useState<Legality | null>(null);
 
-  const [decksList, setDecksList] = useState<DecksList>({ presets: [], saved: [] });
+  const [decksList, setDecksList] = useState<DecksList>({ presets: [], saved: [], presetFormats: {}, savedFormats: {} });
   const [loadFilter, setLoadFilter] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [hoverCard, setHoverCard] = useState<{ name: string; el: HTMLElement } | null>(null);

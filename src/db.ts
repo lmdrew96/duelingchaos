@@ -64,6 +64,16 @@ export async function listSavedDeckNames(userId: string): Promise<string[]> {
   return rows.map((r) => r.name);
 }
 
+export async function listSavedDeckFormats(userId: string): Promise<{ name: string; format: string }[]> {
+  await ensureSchema();
+  const rows = (await getSql()`
+    SELECT name, format FROM decks WHERE user_id = ${userId} ORDER BY name
+  `) as { name: string; format: string | null }[];
+  // Decks saved before the format column existed have format = null — same
+  // 'Standard' fallback as getSavedDeck.
+  return rows.map((r) => ({ name: r.name, format: r.format ?? 'Standard' }));
+}
+
 export async function getSavedDeck(
   userId: string,
   name: string,
