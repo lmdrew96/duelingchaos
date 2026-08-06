@@ -677,6 +677,71 @@
   background: var(--blue-deep);
 }
 
+/* Sits in-flow directly under .board-hud, not floating over the board — a
+   fixed-position toast collides with the hand row on shorter viewports
+   (hands fan out right at the bottom edge), and this is ambient status (see
+   the comment at its call site in Board.tsx), not a decision, so a little
+   layout shift when it appears/disappears is the right tradeoff against
+   ever covering a card. Quiet hairline instead of the gold glow reserved
+   for real decision panels. */
+.priority-status {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--blue-mid);
+  padding: 6px 16px 10px;
+}
+
+.priority-status-message {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+  white-space: pre-line;
+}
+
+.priority-status-buttons {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.priority-status-buttons button {
+  padding: 3px 12px;
+  font-size: 0.72rem;
+}
+
+/* Brief pulse on a real life-total change — gold hex badge otherwise never
+   moves, so a hit or a life-gain spell landed with zero feedback beyond the
+   number itself changing between poll ticks. */
+@keyframes life-flash-up {
+  0%, 30% { filter: drop-shadow(0 0 7px rgba(127, 191, 127, 0.9)); }
+  100% { filter: none; }
+}
+
+@keyframes life-flash-down {
+  0%, 30% { filter: drop-shadow(0 0 9px rgba(217, 118, 90, 0.95)); }
+  100% { filter: none; }
+}
+
+.life-badge.flash-up .life-badge-svg {
+  animation: life-flash-up 0.9s ease-out;
+}
+
+.life-badge.flash-down .life-badge-svg {
+  animation: life-flash-down 0.9s ease-out;
+}
+
+.life-badge.flash-up .life-value {
+  color: var(--ok);
+}
+
+.life-badge.flash-down .life-value {
+  color: var(--danger);
+}
+
 .prompt-panel {
   position: relative;
   align-self: center;

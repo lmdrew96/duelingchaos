@@ -6,6 +6,7 @@ import { markMatchConfirmed } from './PlayGate';
 import { DecoCorners } from './DecoCorner';
 import { DecoCrown } from './DecoCrown';
 import { DecoRule } from './DecoRule';
+import { HeroCardFan } from './HeroCardFan';
 import './Deckbuilder.css';
 import './Home.css';
 
@@ -36,6 +37,7 @@ function Landing({ onNavigate }: { onNavigate: (view: View) => void }) {
           A full rules-accurate game of Magic: The Gathering against the computer — no opponent required.
         </p>
       </div>
+      <HeroCardFan />
       <DecoRule />
 
       <section className="panel landing-cta">
@@ -138,6 +140,7 @@ function Dashboard({
         </div>
         <span className="subtitle">Your decks and match history.</span>
       </header>
+      <HeroCardFan size="sm" />
       <DecoRule />
 
       <div className="layout" style={{ marginTop: 20 }}>

@@ -1,0 +1,72 @@
+/* A fanned arc of card art, masked to fade at both edges so it reads as an
+   atmospheric backdrop rather than a hard-edged image strip — the deco
+   corners/hex badges give this app its chrome, but nothing until now gave
+   it the one asset that's unmistakably "Magic": real card art. */
+/* Width is sized to the fan's own footprint (card width + spread across 6
+   cards, plus clearance for the rotation splay) and centered — NOT stretched
+   to the parent's full width. A percentage-based edge mask on a container
+   that's wider than its content fades emptiness, not cards; on a narrower
+   viewport that same percentage math creeps inward far enough to cut
+   straight through the outer cards instead. Fixed-width container + fixed-
+   px mask stops means the fade always lands on the same few pixels of true
+   edge, regardless of viewport. Height gets a small top padding too — the
+   4th/5th cards' rotated top corner swings a few px above an unrotated
+   card's bounding box, which an exact-height container would clip. */
+.hero-fan {
+  --card-w: 130px;
+  --spread: 78px;
+  --top-offset: 26px;
+  --hover-lift: 8px;
+  position: relative;
+  width: 600px;
+  max-width: 100%;
+  height: 232px;
+  margin: 8px auto 28px;
+  mask-image: linear-gradient(to right, transparent 0, black 20px, black calc(100% - 20px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, black 20px, black calc(100% - 20px), transparent 100%);
+}
+
+.hero-fan-sm {
+  --card-w: 82px;
+  --spread: 48px;
+  --top-offset: 18px;
+  --hover-lift: 5px;
+  width: 372px;
+  height: 150px;
+  margin: 4px auto 16px;
+  mask-image: linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%);
+}
+
+.hero-fan-card {
+  position: absolute;
+  /* Rotated corners swing above an unrotated card's own top edge (up to
+     ~11px at the outermost 15deg tilt) — a real `top` offset, not padding
+     on the parent (padding doesn't move an absolutely-positioned child's
+     offset origin), is what actually gives them clearance. --top-offset
+     has headroom for the hover-lifted state too (see :hover below), not
+     just the resting position — a lift that only clears the resting
+     clearance pokes past it the moment you hover. */
+  top: var(--top-offset);
+  left: 50%;
+  width: var(--card-w);
+  aspect-ratio: 5 / 7;
+  transform: translateX(calc(-50% + var(--i) * var(--spread))) rotate(calc(var(--i) * 6deg));
+  transform-origin: bottom center;
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45), 0 0 18px rgba(237, 202, 55, 0.18);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.hero-fan-card:hover {
+  transform: translateX(calc(-50% + var(--i) * var(--spread))) rotate(calc(var(--i) * 6deg))
+    translateY(calc(-1 * var(--hover-lift)));
+  box-shadow: 0 20px 34px rgba(0, 0, 0, 0.5), 0 0 24px rgba(237, 202, 55, 0.35);
+}
+
+.hero-fan-art {
+  width: 100%;
+  height: 100%;
+}

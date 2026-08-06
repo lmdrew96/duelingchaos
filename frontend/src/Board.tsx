@@ -241,6 +241,7 @@ function PlayerZone({
   onGraveyardClick,
   attackingRefs,
   blockingRefs,
+  lifeFlash,
 }: {
   player: PlayerState;
   faceDownHand: boolean;
@@ -259,6 +260,7 @@ function PlayerZone({
   onGraveyardClick?: () => void;
   attackingRefs?: Set<EntityRef>;
   blockingRefs?: Set<EntityRef>;
+  lifeFlash?: 'up' | 'down';
 }) {
   const playerRef: EntityRef = `player:${player.id}`;
   const playerTargetable = targetableRefs?.has(playerRef) ?? false;
@@ -267,7 +269,7 @@ function PlayerZone({
       <div className="player-row">
         <div
           ref={(el) => registerElementRef(playerRef, el)}
-          className={`life-badge${faceDownHand ? ' opponent' : ''}${playerTargetable ? ' targetable' : ''}`}
+          className={`life-badge${faceDownHand ? ' opponent' : ''}${playerTargetable ? ' targetable' : ''}${lifeFlash ? ` flash-${lifeFlash}` : ''}`}
           onClick={
             playerTargetable
               ? () => onEntityClick?.(playerRef)
@@ -782,6 +784,12 @@ export default function Board({ onExit }: { onExit: () => void }) {
   const [logOpen, setLogOpen] = useState(false);
   const [cheatOpen, setCheatOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Drives the life-badge glow pulse — compared against the previous poll's
+  // values inside load() below, not React state, since the diff has to
+  // happen once per real change regardless of render timing.
+  const prevLifeRef = useRef<Map<number, number>>(new Map());
+  const flashTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  const [lifeFlash, setLifeFlash] = useState<Map<number, 'up' | 'down'>>(new Map());
   // Maps "card:<id>" / "player:<id>" to its rendered element — populated by
   // ref callbacks on CardTile/life-badge/stack-tile as they mount, read back
   // after each commit to compute arrow endpoints and target-click hit areas.
@@ -803,6 +811,34 @@ export default function Board({ onExit }: { onExit: () => void }) {
       .then((s) => {
         setState(s);
         setError(null);
+        // First load establishes the baseline with no flash (prev is
+        // undefined for every player) — only a real change between two
+        // polls should pulse.
+        const prevLife = prevLifeRef.current;
+        const changed = new Map<number, 'up' | 'down'>();
+        for (const p of s.players) {
+          const prev = prevLife.get(p.id);
+          if (prev != null && prev !== p.life) changed.set(p.id, p.life > prev ? 'up' : 'down');
+          prevLife.set(p.id, p.life);
+        }
+        if (changed.size > 0) {
+          setLifeFlash((old) => new Map([...old, ...changed]));
+          for (const id of changed.keys()) {
+            const existing = flashTimers.current.get(id);
+            if (existing) clearTimeout(existing);
+            flashTimers.current.set(
+              id,
+              setTimeout(() => {
+                setLifeFlash((old) => {
+                  const next = new Map(old);
+                  next.delete(id);
+                  return next;
+                });
+                flashTimers.current.delete(id);
+              }, 900),
+            );
+          }
+        }
         // The bridge keeps the finished game view alive after gameOver, but
         // there's nothing left worth polling for — stop hitting the API
         // once the win/loss screen takes over.
@@ -1019,6 +1055,32 @@ export default function Board({ onExit }: { onExit: () => void }) {
         </button>
       </div>
 
+      {/* Forge's showPromptMessage is purely informational status text (the
+          same "Priority: You / Turn / Phase / Stack" readout its own desktop
+          GUI shows as a passive label, not a dialog) — real yes/no decisions
+          always come through pendingChoice instead. Docking this quietly
+          right under the HUD bar, in normal layout flow rather than a
+          floating overlay, keeps it from ever covering the hand row and
+          from reading as an interruption you have to "solve" every priority
+          pass, the way the old centered glowing panel did. */}
+      {!choice && prompt?.message && !state.isMulligan && (
+        <div className="priority-status">
+          <span className="priority-status-message">{prompt.message}</span>
+          <div className="priority-status-buttons">
+            {prompt.button1Enabled && (
+              <button className="ghost" onClick={() => runAction(api.selectOk)}>
+                {prompt.button1}
+              </button>
+            )}
+            {prompt.button2Enabled && (
+              <button className="ghost" onClick={() => runAction(api.selectCancel)}>
+                {prompt.button2}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {!choice && !prompt?.message && (
         <PointerBar
           pointers={state.pointers}
@@ -1041,6 +1103,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
           onGraveyardClick={() => setGraveyardOwnerId(opponent.id)}
           attackingRefs={attackingRefs}
           blockingRefs={blockingRefs}
+          lifeFlash={lifeFlash.get(opponent.id)}
         />
       )}
 
@@ -1062,6 +1125,7 @@ export default function Board({ onExit }: { onExit: () => void }) {
           onGraveyardClick={() => setGraveyardOwnerId(human.id)}
           attackingRefs={attackingRefs}
           blockingRefs={blockingRefs}
+          lifeFlash={lifeFlash.get(human.id)}
         />
       )}
 
@@ -1088,24 +1152,6 @@ export default function Board({ onExit }: { onExit: () => void }) {
             {prompt.button2Enabled && (
               <button className="ghost" onClick={() => runAction(api.selectCancel)}>
                 {prompt.button2 || 'Mulligan'}
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {!choice && prompt?.message && !state.isMulligan && (
-        <div className="prompt-panel">
-          <DecoCorners />
-          <DecoCrown />
-          <p className="prompt-message">{prompt.message}</p>
-          <div className="prompt-buttons">
-            {prompt.button1Enabled && (
-              <button onClick={() => runAction(api.selectOk)}>{prompt.button1}</button>
-            )}
-            {prompt.button2Enabled && (
-              <button className="ghost" onClick={() => runAction(api.selectCancel)}>
-                {prompt.button2}
               </button>
             )}
           </div>
