@@ -990,6 +990,27 @@ export default function Board({ onExit }: { onExit: () => void }) {
     }
   };
 
+  // Space bar passes priority — same action as the priority-status "OK"
+  // button (see the `.priority-status` block below), only wired when that
+  // exact button is actually showing/enabled, so this can't fire during a
+  // pendingChoice, the mulligan panel, or when there's simply no prompt to
+  // answer. Ignores keydowns while focus is in a text input/textarea/select
+  // (search/filter boxes throughout the app use space as a literal
+  // character) so it doesn't hijack typing.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || !state) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (state.pendingChoice || state.isMulligan) return;
+      if (!state.pendingPrompt.message || !state.pendingPrompt.button1Enabled) return;
+      e.preventDefault();
+      runAction(api.selectOk);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [state]);
+
   const pendingChoice = state?.pendingChoice ?? null;
   const choiceKey = pendingChoice
     ? `${pendingChoice.kind}|${pendingChoice.title}|${(pendingChoice.options ?? []).join(',')}`
