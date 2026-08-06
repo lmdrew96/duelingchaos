@@ -126,7 +126,7 @@ function PlayGateCore({
             <select className="format-select" value={deckName} onChange={(e) => setDeckName(e.target.value)}>
               {decksList.saved.map((name) => (
                 <option key={name} value={name}>
-                  {name}
+                  {name} — {decksList.savedFormats[name] ?? 'Standard'}
                 </option>
               ))}
             </select>

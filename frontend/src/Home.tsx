@@ -182,7 +182,9 @@ function Dashboard({
             <ul className="dashboard-deck-list">
               {decksList.saved.map((name) => (
                 <li key={name}>
-                  <span>{name}</span>
+                  <span>
+                    {name} <span className="format-tag">{decksList.savedFormats[name]}</span>
+                  </span>
                   <button disabled={startingDeck !== null} onClick={() => playDeck(name)}>
                     {startingDeck === name ? 'Starting…' : 'Play'}
                   </button>
