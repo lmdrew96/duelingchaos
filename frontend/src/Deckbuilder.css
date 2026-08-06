@@ -49,9 +49,24 @@
   margin-bottom: 12px;
 }
 
+.search-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
 .search-input {
   width: 100%;
-  margin-bottom: 12px;
+  margin-bottom: 0;
+}
+
+.search-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  padding: 0;
 }
 
 .card-list,

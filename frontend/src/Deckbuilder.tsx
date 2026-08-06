@@ -13,6 +13,15 @@ import './Deckbuilder.css';
 
 const CURVE_BUCKETS = 8; // 0,1,2,3,4,5,6,7+
 
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="M20 20l-4.35-4.35" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // Display order for grouped deck-list headers — mirrors the convention most
 // deckbuilders use (creatures/planeswalkers first, lands last), not
 // alphabetical. A hybrid type like "Artifact Creature" lands under Creature
@@ -157,32 +166,27 @@ function DeckbuilderCore({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The debounce timer alone can't prevent every race — a slow response to
-  // an older query can still land after a faster response to a newer one.
-  // requestId guards against that: only the most recently *fired* search
-  // is allowed to write its results.
+  // Search only fires on explicit user intent (Enter or the search button)
+  // rather than per keystroke — Forge's card database is large enough that
+  // searching while typing wastes requests on queries the user isn't done
+  // composing. requestId still guards against a slow response to an older
+  // query landing after a faster response to a newer one.
   const searchRequestId = useRef(0);
-  useEffect(() => {
-    // An empty query matches every card in Forge's database (tens of
-    // thousands of entries) — searching only once the user has typed
-    // something avoids firing that worst case on every page load.
+  const runSearch = () => {
     if (searchQuery.trim() === '') {
       searchRequestId.current++;
       setSearchResults([]);
       setSearchTruncated(false);
       return;
     }
-    const handle = setTimeout(() => {
-      const requestId = ++searchRequestId.current;
-      api.searchCards(searchQuery).then(({ cards, truncated }) => {
-        if (requestId === searchRequestId.current) {
-          setSearchResults(cards);
-          setSearchTruncated(truncated);
-        }
-      });
-    }, 200);
-    return () => clearTimeout(handle);
-  }, [searchQuery]);
+    const requestId = ++searchRequestId.current;
+    api.searchCards(searchQuery).then(({ cards, truncated }) => {
+      if (requestId === searchRequestId.current) {
+        setSearchResults(cards);
+        setSearchTruncated(truncated);
+      }
+    });
+  };
 
   useEffect(() => {
     if (deckCards.length === 0) {
@@ -466,13 +470,27 @@ function DeckbuilderCore({
         <section className="panel">
           <DecoCorners />
           <h2>Card search</h2>
-          <input
-            className="search-input"
-            type="text"
-            placeholder="Search by name, or syntax: t:creature c:rg mv>=3 o:&quot;draw a card&quot;…"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+          <div className="search-row">
+            <input
+              className="search-input"
+              type="text"
+              placeholder="Search by name, or syntax: t:creature c:rg mv>=3 o:&quot;draw a card&quot;…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') runSearch();
+              }}
+            />
+            <button
+              type="button"
+              className="search-button"
+              onClick={runSearch}
+              title="Search"
+              aria-label="Search"
+            >
+              <SearchIcon />
+            </button>
+          </div>
           {commanderCard && (
             <p className="empty-hint">
               Filtered to {commanderCard.name}'s color identity
