@@ -66,17 +66,17 @@ function startForgeShim(
   deck2: string,
   aiProfile?: string,
   gameMode?: string,
+  puzzleFile?: string,
 ): Promise<ChildProcessWithoutNullStreams> {
   return new Promise((resolve, reject) => {
     const classpath = `${FORGE_JAR}:${SHIM_BUILD_DIR}`;
     const args = ['-cp', classpath, 'dev.duelingchaos.bridge.BridgeMain', deck1, deck2, String(JAVA_PORT), PRESETS_DIR];
-    // Positional CLI args on the Java side — gameMode needs the aiProfile
-    // slot filled (even if empty) to land at the right index.
-    if (gameMode) {
-      args.push(aiProfile ?? '', gameMode);
-    } else if (aiProfile) {
-      args.push(aiProfile);
-    }
+    // Positional CLI args on the Java side — trailing params need every
+    // earlier slot filled (even with an empty placeholder) to land at the
+    // right index.
+    const trailing = [aiProfile ?? '', gameMode ?? '', puzzleFile ?? ''];
+    while (trailing.length > 0 && !trailing[trailing.length - 1]) trailing.pop();
+    args.push(...trailing);
     const child = spawn('java', args, { cwd: FORGE_DIR });
 
     let resolved = false;
@@ -104,7 +104,13 @@ function startForgeShim(
 // race the old one for the port. Any in-flight request during this window
 // gets the existing "Forge shim unreachable" 502 from proxyToShim, which the
 // board already renders as a retry-able error.
-async function restartMatch(deck1: string, deck2: string, aiProfile?: string, gameMode?: string): Promise<void> {
+async function restartMatch(
+  deck1: string,
+  deck2: string,
+  aiProfile?: string,
+  gameMode?: string,
+  puzzleFile?: string,
+): Promise<void> {
   if (forgeProcess) {
     const dying = forgeProcess;
     await new Promise<void>((resolve) => {
@@ -112,7 +118,7 @@ async function restartMatch(deck1: string, deck2: string, aiProfile?: string, ga
       dying.kill();
     });
   }
-  forgeProcess = await startForgeShim(deck1, deck2, aiProfile, gameMode);
+  forgeProcess = await startForgeShim(deck1, deck2, aiProfile, gameMode, puzzleFile);
 }
 
 // Forge has no classes reachable from Node to serialize a real .dck file, so
@@ -353,17 +359,20 @@ async function handleMatchStart(req: http.IncomingMessage, res: http.ServerRespo
   let opponentDeck: string | undefined;
   let aiProfile: string | undefined;
   let gameMode: string | undefined;
+  let puzzleFile: string | undefined;
   try {
     const parsed = JSON.parse(body) as {
       deckName?: string;
       opponentDeck?: string;
       aiProfile?: string;
       gameMode?: string;
+      puzzleFile?: string;
     };
     deckName = parsed.deckName;
     opponentDeck = parsed.opponentDeck;
     aiProfile = parsed.aiProfile;
     gameMode = parsed.gameMode;
+    puzzleFile = parsed.puzzleFile;
   } catch {
     respondJson(res, 400, { error: 'invalid JSON body' });
     return;
@@ -374,6 +383,20 @@ async function handleMatchStart(req: http.IncomingMessage, res: http.ServerRespo
   }
   if (gameMode && gameMode !== 'momir') {
     respondJson(res, 400, { error: `unknown gameMode: ${gameMode}` });
+    return;
+  }
+  // Passed straight through as a BridgeMain CLI arg resolved relative to
+  // vendor/forge's res/puzzle — reject anything that isn't a bare .pzl
+  // filename before it ever reaches the spawn() args array.
+  if (puzzleFile && !/^[A-Za-z0-9_.-]+\.pzl$/.test(puzzleFile)) {
+    respondJson(res, 400, { error: 'invalid puzzleFile' });
+    return;
+  }
+
+  if (puzzleFile) {
+    await restartMatch('', '', undefined, undefined, puzzleFile);
+    currentMatch = { userId, deckName: `Puzzle: ${puzzleFile}`, reported: false };
+    respondJson(res, 200, { ok: true });
     return;
   }
 

@@ -8,6 +8,7 @@ import type {
   GameState,
   Legality,
   MatchStats,
+  PuzzleInfo,
 } from './types';
 
 const BASE = '/api';
@@ -112,13 +113,23 @@ export async function startMatch(
   token: string | null,
   aiProfile?: string,
   gameMode?: string,
+  puzzleFile?: string,
 ): Promise<void> {
   const res = await fetch(`${BASE}/match/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders(token) },
-    body: JSON.stringify({ deckName, opponentDeck, aiProfile, gameMode }),
+    body: JSON.stringify({ deckName, opponentDeck, aiProfile, gameMode, puzzleFile }),
   });
   if (!res.ok) throw new Error('failed to start match');
+}
+
+// Forge's bundled .pzl puzzle files (vendor/forge's own res/puzzle) —
+// proxied straight through from the shim's /puzzles/list, no auth needed
+// since it's static content, not a saved deck.
+export async function listPuzzles(): Promise<PuzzleInfo[]> {
+  const res = await fetch(`${BASE}/puzzles/list`);
+  if (!res.ok) return [];
+  return res.json();
 }
 
 // Fired once by the board when it sees gameOver — no-ops server-side if the

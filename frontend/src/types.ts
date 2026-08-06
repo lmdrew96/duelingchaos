@@ -38,6 +38,8 @@ export type DecksList = {
 export type MatchHistoryEntry = { deckName: string; won: boolean; isDraw: boolean; playedAt: string };
 export type MatchStats = { wins: number; losses: number; draws: number; recent: MatchHistoryEntry[] };
 
+export type PuzzleInfo = { file: string; name?: string; goal?: string; difficulty?: string; description?: string };
+
 export type Legality = {
   legal: boolean;
   deckSize: number;

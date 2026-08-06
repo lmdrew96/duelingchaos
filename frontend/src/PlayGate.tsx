@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@clerk/react';
 import * as api from './api';
-import type { DecksList } from './types';
+import type { DecksList, PuzzleInfo } from './types';
 import { DecoCorners } from './DecoCorner';
 import { DecoCrown } from './DecoCrown';
 import { DecoRule } from './DecoRule';
@@ -112,7 +112,9 @@ function PlayGateCore({
   const [deckName, setDeckName] = useState('');
   const [opponentDeck, setOpponentDeck] = useState('random');
   const [aiProfile, setAiProfile] = useState('Default');
-  const [momirMode, setMomirMode] = useState(false);
+  const [mode, setMode] = useState<'standard' | 'momir' | 'puzzle'>('standard');
+  const [puzzles, setPuzzles] = useState<PuzzleInfo[]>([]);
+  const [puzzleFile, setPuzzleFile] = useState('');
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aiWarningCards, setAiWarningCards] = useState<string[]>([]);
@@ -126,6 +128,10 @@ function PlayGateCore({
         setDeckName((prev) => prev || list.saved[0] || '');
       })
       .catch(() => undefined);
+    api.listPuzzles().then((list) => {
+      setPuzzles(list);
+      setPuzzleFile((prev) => prev || list[0]?.file || '');
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -167,7 +173,8 @@ function PlayGateCore({
         opponentDeck === 'random' ? undefined : opponentDeck,
         token,
         aiProfile,
-        momirMode ? 'momir' : undefined,
+        mode === 'momir' ? 'momir' : undefined,
+        mode === 'puzzle' ? puzzleFile : undefined,
       );
       markMatchConfirmed();
       onConfirmed();
@@ -179,7 +186,12 @@ function PlayGateCore({
   };
 
   const handleStart = () => {
-    if (momirMode) {
+    if (mode === 'momir') {
+      doStart();
+      return;
+    }
+    if (mode === 'puzzle') {
+      if (!puzzleFile) return;
       doStart();
       return;
     }
@@ -190,6 +202,8 @@ function PlayGateCore({
     }
     doStart();
   };
+
+  const selectedPuzzle = puzzles.find((p) => p.file === puzzleFile);
 
   const handleSkip = () => {
     markMatchConfirmed();
@@ -217,11 +231,17 @@ function PlayGateCore({
           </>
         ) : (
           <>
-            <label className="field-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" checked={momirMode} onChange={(e) => setMomirMode(e.target.checked)} />
-              Momir Basic (chaos mode — cast random creatures off a basics-only library, no deckbuilding)
-            </label>
-            {momirMode ? (
+            <span className="field-label">Mode</span>
+            <select
+              className="format-select"
+              value={mode}
+              onChange={(e) => setMode(e.target.value as 'standard' | 'momir' | 'puzzle')}
+            >
+              <option value="standard">Standard match</option>
+              <option value="momir">Momir Basic (chaos mode — random creatures off a basics-only library)</option>
+              <option value="puzzle">Puzzle (solve a pre-built board state)</option>
+            </select>
+            {mode === 'momir' ? (
               <>
                 <span className="field-label" style={{ marginTop: 12 }}>
                   AI personality
@@ -240,6 +260,38 @@ function PlayGateCore({
                 <div className="save-row" style={{ marginTop: 16 }}>
                   <button disabled={starting} onClick={handleStart}>
                     {starting ? 'Starting…' : 'Start match'}
+                  </button>
+                  <button className="ghost" onClick={handleSkip}>
+                    Continue to the current game
+                  </button>
+                </div>
+                {error && <p className="status-message">{error}</p>}
+              </>
+            ) : mode === 'puzzle' ? (
+              <>
+                <span className="field-label" style={{ marginTop: 12 }}>
+                  Puzzle
+                </span>
+                <select
+                  className="format-select"
+                  value={puzzleFile}
+                  onChange={(e) => setPuzzleFile(e.target.value)}
+                >
+                  {puzzles.map((p) => (
+                    <option key={p.file} value={p.file}>
+                      {p.name ?? p.file} {p.difficulty ? `(${p.difficulty})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {selectedPuzzle && (
+                  <p className="empty-hint" style={{ marginTop: 4, whiteSpace: 'pre-line' }}>
+                    {selectedPuzzle.goal}
+                    {selectedPuzzle.description ? `\n${selectedPuzzle.description}` : ''}
+                  </p>
+                )}
+                <div className="save-row" style={{ marginTop: 16 }}>
+                  <button disabled={starting || !puzzleFile} onClick={handleStart}>
+                    {starting ? 'Starting…' : 'Start puzzle'}
                   </button>
                   <button className="ghost" onClick={handleSkip}>
                     Continue to the current game
