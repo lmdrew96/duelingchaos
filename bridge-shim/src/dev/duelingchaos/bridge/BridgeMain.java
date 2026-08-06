@@ -68,12 +68,30 @@ public class BridgeMain {
         File decksDir = args.length > 3 ? new File(args[3]) : new File("decks");
         File preconsDir = args.length > 4 ? new File(args[4]) : new File("res/quest/precons");
 
-        GameRules rules = new GameRules(GameType.Constructed);
-        rules.setAppliedVariants(EnumSet.of(GameType.Constructed));
+        // Hardcoding Constructed here meant a deck's [Commander] section
+        // never actually seeded a command zone at runtime — Forge only
+        // does that under the Commander game type. Detected from the deck
+        // files themselves (whether either side has a Commander section)
+        // rather than threaded through as a separate param end-to-end from
+        // PlayGate, since the deck's own shape is already the source of
+        // truth DeckboxHandlers' legality checks use for the same question.
+        GameType type = (humanDeck.has(DeckSection.Commander) || aiDeck.has(DeckSection.Commander))
+            ? GameType.Commander : GameType.Constructed;
+        GameRules rules = new GameRules(type);
+        rules.setAppliedVariants(EnumSet.of(type));
 
-        RegisteredPlayer rpHuman = new RegisteredPlayer(humanDeck);
+        // RegisteredPlayer's plain constructor puts every card (commander
+        // included) straight into the library — confirmed live: with
+        // GameType.Commander set above but this left as `new
+        // RegisteredPlayer(deck)`, the command zone stayed empty and
+        // libraryCount included the commander uncut. forCommander(deck)
+        // is the factory that actually pulls the Commander section out
+        // into RegisteredPlayer.commanders for Game to seed the zone from.
+        RegisteredPlayer rpHuman = humanDeck.has(DeckSection.Commander)
+            ? RegisteredPlayer.forCommander(humanDeck) : new RegisteredPlayer(humanDeck);
         rpHuman.setPlayer(new LobbyPlayerHuman("You"));
-        RegisteredPlayer rpAi = new RegisteredPlayer(aiDeck);
+        RegisteredPlayer rpAi = aiDeck.has(DeckSection.Commander)
+            ? RegisteredPlayer.forCommander(aiDeck) : new RegisteredPlayer(aiDeck);
         rpAi.setPlayer(GamePlayerUtil.createAiPlayer(aiDeck.getName(), 1));
 
         List<RegisteredPlayer> players = new ArrayList<>();
