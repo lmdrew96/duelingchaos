@@ -97,3 +97,55 @@
   min-width: 1.5em;
   text-align: right;
 }
+
+.stats-line {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.stats-number {
+  font-family: var(--mono);
+  font-size: 1.1rem;
+  color: var(--gold);
+}
+
+.balance-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.balance-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.balance-bars {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Same bar as color-bar-fill but a muted gold, distinct from the blue "cost"
+   bar above it — read top-to-bottom as "required" vs. "available". */
+.balance-sources {
+  background: var(--gold);
+}
+
+.token-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.token-tag {
+  padding: 3px 10px;
+  border: 1px solid var(--blue-mid);
+  background: var(--bg-panel);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: capitalize;
+}

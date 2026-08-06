@@ -8,6 +8,7 @@ import { CardHoverPreview } from './CardHoverPreview';
 import { DecoCorners } from './DecoCorner';
 import { DecoRule } from './DecoRule';
 import { DeckStats } from './DeckStats';
+import { computeExpandedDeckStats } from './deckStatsUtils';
 import './Deckbuilder.css';
 
 const CURVE_BUCKETS = 8; // 0,1,2,3,4,5,6,7+
@@ -274,6 +275,11 @@ function DeckbuilderCore({
     }
     return counts;
   }, [deckCards, cardInfoCache]);
+
+  const expandedStats = useMemo(
+    () => computeExpandedDeckStats(deckCards.filter((c) => c.section !== 'sideboard'), cardInfoCache),
+    [deckCards, cardInfoCache],
+  );
 
   const addCard = (name: string, info?: CardInfo) => {
     // Defensive re-check against a stale/not-yet-loaded commanderIdentity —
@@ -559,7 +565,9 @@ function DeckbuilderCore({
             )}
           </div>
 
-          {deckCards.length > 0 && <DeckStats manaCurve={manaCurve} colorCounts={colorCounts} />}
+          {deckCards.length > 0 && (
+            <DeckStats manaCurve={manaCurve} colorCounts={colorCounts} expanded={expandedStats} />
+          )}
         </section>
 
         <section className="panel">
