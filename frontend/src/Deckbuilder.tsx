@@ -150,6 +150,14 @@ function DeckbuilderCore({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [hoverCard, setHoverCard] = useState<{ name: string; el: HTMLElement } | null>(null);
 
+  // Toast-style: clear itself a few seconds after each new message instead
+  // of sitting there until the next save/load/delete overwrites it.
+  useEffect(() => {
+    if (!statusMessage) return;
+    const handle = setTimeout(() => setStatusMessage(null), 3000);
+    return () => clearTimeout(handle);
+  }, [statusMessage]);
+
   const refreshDecksList = () => {
     getToken()
       .then((token) => api.listDecks(token))
