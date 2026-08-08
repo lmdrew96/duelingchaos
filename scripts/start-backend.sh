@@ -20,8 +20,8 @@ echo "Building bridge shim (javac)..."
 npm run build:shim
 
 echo "Starting backend..."
-nohup node dist/index.js > "$LOG_FILE" 2>&1 &
-echo $! > "$PID_FILE"
+echo "===== $(date '+%Y-%m-%d %H:%M:%S') backend start =====" >> "$LOG_FILE"
+node scripts/detached-start.js
 sleep 1
 
 if ! kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
